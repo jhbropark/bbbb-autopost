@@ -149,7 +149,7 @@ def publish_instagram_carousel(image_urls: list[str], caption: str) -> dict[str,
 
 def publish_facebook_multiphoto(image_paths: list[Path], caption: str) -> dict[str, Any]:
     page_id = require_env("FACEBOOK_PAGE_ID")
-    token = require_env("META_SYSTEM_USER_ACCESS_TOKEN")
+    token = require_env("FACEBOOK_PAGE_ACCESS_TOKEN")
     photo_ids = []
     for path in image_paths:
         photo = request_multipart(

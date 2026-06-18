@@ -2,9 +2,10 @@
 
 This repo can publish generated bbbb.beauty content without browser login by using:
 
-1. Meta Business System User Token
-2. GitHub Pages as public image hosting
-3. GitHub Actions scheduled workflow
+1. Meta Business System User Token for Instagram
+2. Facebook Page Access Token for Facebook Page publishing
+3. GitHub Pages as public image hosting
+4. GitHub Actions scheduled workflow
 
 ## Required GitHub Settings
 
@@ -17,6 +18,7 @@ This repo can publish generated bbbb.beauty content without browser login by usi
 ```text
 META_GRAPH_VERSION=v25.0
 META_SYSTEM_USER_ACCESS_TOKEN=...
+FACEBOOK_PAGE_ACCESS_TOKEN=...
 FACEBOOK_PAGE_ID=1195784186945659
 INSTAGRAM_ACCOUNT_ID=17841424189525618
 ```
@@ -25,23 +27,34 @@ Do not store these values in committed files.
 
 ## Meta Token Requirement
 
-Use a Meta Business system user token, not a Graph API Explorer token.
+Use separate tokens for each publishing surface:
 
-Minimum permissions for the current workflow:
+- Instagram: Meta Business system user token stored as `META_SYSTEM_USER_ACCESS_TOKEN`
+- Facebook: Page access token stored as `FACEBOOK_PAGE_ACCESS_TOKEN`
+
+Minimum Instagram system user token permissions:
 
 ```text
-pages_show_list
-pages_read_engagement
-pages_manage_posts
 instagram_basic
 instagram_content_publish
 business_management
 ```
 
-The system user must have access to:
+Minimum Facebook Page token permissions:
+
+```text
+pages_show_list
+pages_read_engagement
+pages_manage_posts
+```
+
+The Meta Business system user must have access to:
+
+- Instagram account: `bbbb.beauty_official`
+
+The Facebook Page access token must belong to:
 
 - Facebook Page: `Beyond Beauty Building Brands`
-- Instagram account: `bbbb.beauty_official`
 
 ## What The Workflow Does
 
