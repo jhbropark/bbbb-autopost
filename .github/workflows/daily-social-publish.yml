@@ -23,9 +23,7 @@ concurrency:
 jobs:
   build-publish:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    environment: github-pages
     env:
       META_GRAPH_VERSION: ${{ secrets.META_GRAPH_VERSION }}
       META_SYSTEM_USER_ACCESS_TOKEN: ${{ secrets.META_SYSTEM_USER_ACCESS_TOKEN }}
