@@ -1,0 +1,102 @@
+name: Daily Social Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validate without publishing"
+        required: false
+        default: "false"
+  schedule:
+    # 09:00 KST
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      META_GRAPH_VERSION: ${{ secrets.META_GRAPH_VERSION }}
+      META_SYSTEM_USER_ACCESS_TOKEN: ${{ secrets.META_SYSTEM_USER_ACCESS_TOKEN }}
+      FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
+      INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+      TZ: Asia/Seoul
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system fonts
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate content
+        run: python create_2026_06_16_moa_post.py
+
+      - name: Prepare GitHub Pages asset folder
+        shell: bash
+        run: |
+          PUBLIC_PATH="social/${GITHUB_RUN_ID}/moa"
+          mkdir -p "_site/${PUBLIC_PATH}"
+          cp artifacts/2026-06-16-moa-visualization/carousel/*.png "_site/${PUBLIC_PATH}/"
+          echo "PUBLIC_PATH=${PUBLIC_PATH}" >> "$GITHUB_ENV"
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Publish to Meta
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir artifacts/2026-06-16-moa-visualization/carousel \
+            --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
+            --instagram-caption artifacts/2026-06-16-moa-visualization/instagram-caption.txt \
+            --facebook-caption artifacts/2026-06-16-moa-visualization/facebook-caption.txt \
+            --out artifacts/2026-06-16-moa-visualization/github-actions-publish-results.json
+
+      - name: Validate publish inputs only
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir artifacts/2026-06-16-moa-visualization/carousel \
+            --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
+            --instagram-caption artifacts/2026-06-16-moa-visualization/instagram-caption.txt \
+            --facebook-caption artifacts/2026-06-16-moa-visualization/facebook-caption.txt \
+            --out artifacts/2026-06-16-moa-visualization/github-actions-publish-results.json \
+            --dry-run
+
+      - name: Upload publish log
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-log
+          path: artifacts/2026-06-16-moa-visualization/github-actions-publish-results.json

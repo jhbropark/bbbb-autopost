@@ -1,0 +1,78 @@
+# GitHub Actions Social Publishing Setup
+
+This repo can publish generated bbbb.beauty content without browser login by using:
+
+1. Meta Business System User Token
+2. GitHub Pages as public image hosting
+3. GitHub Actions scheduled workflow
+
+## Required GitHub Settings
+
+1. Create or connect a GitHub repository.
+2. Push this project to the repository.
+3. In the repository, go to `Settings > Pages`.
+4. Set source to `GitHub Actions`.
+5. Add these repository secrets:
+
+```text
+META_GRAPH_VERSION=v25.0
+META_SYSTEM_USER_ACCESS_TOKEN=...
+FACEBOOK_PAGE_ID=1195784186945659
+INSTAGRAM_ACCOUNT_ID=17841424189525618
+```
+
+Do not store these values in committed files.
+
+## Meta Token Requirement
+
+Use a Meta Business system user token, not a Graph API Explorer token.
+
+Minimum permissions for the current workflow:
+
+```text
+pages_show_list
+pages_read_engagement
+pages_manage_posts
+instagram_basic
+instagram_content_publish
+business_management
+```
+
+The system user must have access to:
+
+- Facebook Page: `Beyond Beauty Building Brands`
+- Instagram account: `bbbb.beauty_official`
+
+## What The Workflow Does
+
+`.github/workflows/daily-social-publish.yml` runs daily at `09:00 KST`.
+
+Steps:
+
+1. Generate the carousel images.
+2. Copy images to a GitHub Pages artifact path.
+3. Deploy the artifact to GitHub Pages.
+4. Use the public Pages URLs as Instagram `image_url` values.
+5. Publish an Instagram carousel.
+6. Publish a Facebook multi-photo post.
+7. Upload a publish result JSON as a workflow artifact.
+
+## Dry Run
+
+Run the workflow manually with:
+
+```text
+dry_run = true
+```
+
+This validates generated image URLs and captions without publishing to Meta.
+
+## Current Limitation
+
+The current content generator is the MOA carousel generator:
+
+```text
+create_2026_06_16_moa_post.py
+```
+
+For a fully rotating daily calendar, add a date-based content router that selects the topic and generator for each day.
