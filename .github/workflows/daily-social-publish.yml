@@ -33,6 +33,7 @@ jobs:
       LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
       LINKEDIN_AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
       LINKEDIN_VERSION: ${{ secrets.LINKEDIN_VERSION || '202605' }}
+      X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
       TZ: Asia/Seoul
 
     steps:
@@ -87,6 +88,7 @@ jobs:
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
             --linkedin-caption "${CONTENT_DIR}/linkedin-post.txt" \
+            --x-caption "${CONTENT_DIR}/x-post.txt" \
             --out "${CONTENT_DIR}/github-actions-publish-results.json"
 
       - name: Validate publish inputs only
@@ -98,6 +100,7 @@ jobs:
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
             --linkedin-caption "${CONTENT_DIR}/linkedin-post.txt" \
+            --x-caption "${CONTENT_DIR}/x-post.txt" \
             --out "${CONTENT_DIR}/github-actions-publish-results.json" \
             --dry-run
 

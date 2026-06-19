@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish one post to Facebook Pages, Instagram, and LinkedIn."""
+"""Publish one post to Facebook Pages, Instagram, LinkedIn, and X."""
 
 from __future__ import annotations
 
@@ -365,6 +365,81 @@ def publish_linkedin(text: str, image_path: Path | None) -> dict[str, Any]:
     return {"id": post_id, "response": response}
 
 
+def x_headers(content_type: str = "application/json") -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}",
+        "Content-Type": content_type,
+    }
+
+
+def discover_x() -> list[dict[str, Any]]:
+    query = urlencode({"user.fields": "id,name,username"})
+    response, _ = request_json(
+        "GET",
+        f"https://api.x.com/2/users/me?{query}",
+        headers={"Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}"},
+    )
+    user = response.get("data", {})
+    if not user.get("id"):
+        raise PublisherError(f"X did not return a user ID: {response}")
+    return [
+        {
+            "channel": "x",
+            "id": user.get("id"),
+            "username": user.get("username"),
+            "name": user.get("name"),
+        }
+    ]
+
+
+def upload_x_image(image_path: Path) -> str:
+    body, boundary = multipart_body(
+        {
+            "media_category": "tweet_image",
+            "media_type": (
+                mimetypes.guess_type(image_path.name)[0]
+                or "application/octet-stream"
+            ),
+        },
+        "media",
+        image_path,
+    )
+    response, _ = request_json(
+        "POST",
+        "https://api.x.com/2/media/upload",
+        headers=x_headers(f"multipart/form-data; boundary={boundary}"),
+        raw_body=body,
+    )
+    data = response.get("data", {})
+    media_id = data.get("id") or data.get("media_id_string")
+    if not media_id:
+        raise PublisherError(f"X media upload did not return an ID: {response}")
+    return str(media_id)
+
+
+def publish_x(text: str, image_path: Path | None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"text": text}
+    if image_path:
+        payload["media"] = {"media_ids": [upload_x_image(image_path)]}
+    response, _ = request_json(
+        "POST",
+        "https://api.x.com/2/tweets",
+        headers=x_headers(),
+        data=payload,
+    )
+    tweet = response.get("data", {})
+    return {
+        "id": tweet.get("id"),
+        "text": tweet.get("text"),
+        "url": (
+            f"https://x.com/i/web/status/{tweet.get('id')}"
+            if tweet.get("id")
+            else None
+        ),
+        "response": response,
+    }
+
+
 def resolve_image(path_value: str | None) -> Path | None:
     if not path_value:
         return None
@@ -398,6 +473,9 @@ def configured_channels() -> dict[str, dict[str, str]]:
         "linkedin": {
             "LINKEDIN_AUTHOR_URN": os.getenv("LINKEDIN_AUTHOR_URN", ""),
             "LINKEDIN_ACCESS_TOKEN": os.getenv("LINKEDIN_ACCESS_TOKEN", ""),
+        },
+        "x": {
+            "X_ACCESS_TOKEN": os.getenv("X_ACCESS_TOKEN", ""),
         },
     }
 
@@ -451,6 +529,11 @@ def command_discover(platform: str) -> int:
             channels.extend(discover_linkedin())
         except PublisherError as error:
             errors["linkedin"] = str(error)
+    if platform in {"all", "x"}:
+        try:
+            channels.extend(discover_x())
+        except PublisherError as error:
+            errors["x"] = str(error)
 
     safe_channels = []
     for channel in channels:
@@ -472,7 +555,7 @@ def command_publish(args: argparse.Namespace) -> int:
     text = read_text(args)
     image_path = resolve_image(args.image)
     selected = [item.strip() for item in args.channels.split(",") if item.strip()]
-    supported = {"facebook", "instagram", "linkedin"}
+    supported = {"facebook", "instagram", "linkedin", "x"}
     invalid = sorted(set(selected) - supported)
     if invalid:
         raise PublisherError(f"Unsupported channels: {', '.join(invalid)}")
@@ -495,6 +578,8 @@ def command_publish(args: argparse.Namespace) -> int:
             results[channel] = publish_instagram(text, args.image_url)
         elif channel == "linkedin":
             results[channel] = publish_linkedin(text, image_path)
+        elif channel == "x":
+            results[channel] = publish_x(text, image_path)
     print(json.dumps(results, ensure_ascii=False, indent=2))
     return 0
 
@@ -515,14 +600,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     discover.add_argument(
         "--platform",
-        choices=("all", "meta", "linkedin"),
+        choices=("all", "meta", "linkedin", "x"),
         default="all",
         help="Platform to inspect (default: all).",
     )
     publish = subparsers.add_parser("publish", help="Publish a social post.")
     publish.add_argument(
         "--channels",
-        default="facebook,instagram,linkedin",
+        default="facebook,instagram,linkedin,x",
         help="Comma-separated channel names.",
     )
     text_group = publish.add_mutually_exclusive_group(required=True)

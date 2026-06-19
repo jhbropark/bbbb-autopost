@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish generated carousel content to Instagram and Facebook via Meta APIs."""
+"""Publish generated carousel content to Instagram, Facebook, LinkedIn, and X."""
 
 from __future__ import annotations
 
@@ -274,6 +274,62 @@ def publish_linkedin_post(image_path: Path, caption: str) -> dict[str, Any]:
     return {"id": post_id, "response": response, "image": image_urn}
 
 
+def x_headers(content_type: str = "application/json") -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}",
+        "Content-Type": content_type,
+        "User-Agent": "bbbb-social-automation/1.0",
+    }
+
+
+def upload_x_image(image_path: Path) -> str:
+    body, boundary = multipart_body(
+        {
+            "media_category": "tweet_image",
+            "media_type": mimetypes.guess_type(image_path.name)[0] or "application/octet-stream",
+        },
+        "media",
+        image_path,
+    )
+    request = Request(
+        "https://api.x.com/2/media/upload",
+        data=body,
+        headers=x_headers(f"multipart/form-data; boundary={boundary}"),
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=120) as result:
+            payload = result.read()
+            response = json.loads(payload.decode("utf-8")) if payload else {}
+    except HTTPError as error:
+        payload = error.read().decode("utf-8", errors="replace")
+        raise PublishError(f"POST https://api.x.com/2/media/upload failed HTTP {error.code}: {payload}") from error
+    except URLError as error:
+        raise PublishError(f"POST https://api.x.com/2/media/upload failed: {error.reason}") from error
+    data = response.get("data", {})
+    media_id = data.get("id") or data.get("media_id_string")
+    if not media_id:
+        raise PublishError(f"X media upload did not return an ID: {response}")
+    return str(media_id)
+
+
+def publish_x_post(image_path: Path, caption: str) -> dict[str, Any]:
+    media_id = upload_x_image(image_path)
+    response, _ = request_json_with_headers(
+        "POST",
+        "https://api.x.com/2/tweets",
+        x_headers(),
+        {"text": caption, "media": {"media_ids": [media_id]}},
+    )
+    tweet = response.get("data", {})
+    return {
+        "id": tweet.get("id"),
+        "url": f"https://x.com/i/web/status/{tweet.get('id')}" if tweet.get("id") else None,
+        "response": response,
+        "image": media_id,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--carousel-dir", required=True)
@@ -281,6 +337,7 @@ def main() -> int:
     parser.add_argument("--instagram-caption", required=True)
     parser.add_argument("--facebook-caption", required=True)
     parser.add_argument("--linkedin-caption")
+    parser.add_argument("--x-caption")
     parser.add_argument("--out", required=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -300,6 +357,10 @@ def main() -> int:
     if args.linkedin_caption:
         linkedin_caption = Path(args.linkedin_caption).read_text(encoding="utf-8").strip()
         payload["linkedin_caption_length"] = len(linkedin_caption)
+    x_caption = None
+    if args.x_caption:
+        x_caption = Path(args.x_caption).read_text(encoding="utf-8").strip()
+        payload["x_caption_length"] = len(x_caption)
     if not args.dry_run:
         payload["instagram"] = publish_instagram_carousel(
             image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
@@ -309,6 +370,8 @@ def main() -> int:
         )
         if linkedin_caption:
             payload["linkedin"] = publish_linkedin_post(image_paths[0], linkedin_caption)
+        if x_caption:
+            payload["x"] = publish_x_post(image_paths[0], x_caption)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

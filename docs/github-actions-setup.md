@@ -5,8 +5,9 @@ This repo can publish generated bbbb.beauty content without browser login by usi
 1. Meta Business System User Token for Instagram
 2. Facebook Page Access Token for Facebook Page publishing
 3. LinkedIn OAuth access token for LinkedIn publishing
-4. GitHub Pages as public image hosting
-5. GitHub Actions scheduled workflow
+4. X OAuth 2.0 user access token for X publishing
+5. GitHub Pages as public image hosting
+6. GitHub Actions scheduled workflow
 
 ## Required GitHub Settings
 
@@ -25,6 +26,7 @@ INSTAGRAM_ACCOUNT_ID=17841424189525618
 LINKEDIN_ACCESS_TOKEN=...
 LINKEDIN_AUTHOR_URN=urn:li:person:...
 LINKEDIN_VERSION=202605
+X_ACCESS_TOKEN=...
 ```
 
 Do not store these values in committed files.
@@ -69,6 +71,18 @@ w_member_social
 For an organization page, use `w_organization_social` and set `LINKEDIN_AUTHOR_URN` to
 `urn:li:organization:{id}`. For a personal profile, use `urn:li:person:{id}`.
 
+Minimum X OAuth 2.0 user token scopes:
+
+```text
+tweet.read
+tweet.write
+users.read
+media.write
+offline.access
+```
+
+Use an X user-context OAuth 2.0 token. App-only bearer tokens cannot create Posts.
+
 ## What The Workflow Does
 
 `.github/workflows/daily-social-publish.yml` runs daily at `09:00 KST`.
@@ -82,7 +96,8 @@ Steps:
 5. Publish an Instagram carousel.
 6. Publish a Facebook multi-photo post.
 7. Publish a LinkedIn image post using the first carousel slide.
-8. Upload a publish result JSON as a workflow artifact.
+8. Publish an X image post using the first carousel slide.
+9. Upload a publish result JSON as a workflow artifact.
 
 ## Dry Run
 
