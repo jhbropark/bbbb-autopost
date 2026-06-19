@@ -49,6 +49,38 @@ def request_json(method: str, url: str, data: dict[str, Any] | None = None) -> d
         raise PublishError(f"{method} {url} failed: {error.reason}") from error
 
 
+def request_json_with_headers(
+    method: str,
+    url: str,
+    headers: dict[str, str],
+    data: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], dict[str, str]]:
+    body = json.dumps(data, ensure_ascii=False).encode("utf-8") if data else None
+    request = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=120) as response:
+            payload = response.read()
+            parsed = json.loads(payload.decode("utf-8")) if payload else {}
+            return parsed, dict(response.headers.items())
+    except HTTPError as error:
+        payload = error.read().decode("utf-8", errors="replace")
+        raise PublishError(f"{method} {url} failed HTTP {error.code}: {payload}") from error
+    except URLError as error:
+        raise PublishError(f"{method} {url} failed: {error.reason}") from error
+
+
+def request_bytes(method: str, url: str, body: bytes, headers: dict[str, str]) -> None:
+    request = Request(url, data=body, headers=headers, method=method)
+    try:
+        with urlopen(request, timeout=120):
+            return
+    except HTTPError as error:
+        payload = error.read().decode("utf-8", errors="replace")
+        raise PublishError(f"{method} {url} failed HTTP {error.code}: {payload}") from error
+    except URLError as error:
+        raise PublishError(f"{method} {url} failed: {error.reason}") from error
+
+
 def multipart_body(fields: dict[str, str], file_field: str, file_path: Path) -> tuple[bytes, str]:
     boundary = f"----bbbb-social-{uuid.uuid4().hex}"
     chunks: list[bytes] = []
@@ -180,12 +212,75 @@ def publish_facebook_multiphoto(image_paths: list[Path], caption: str) -> dict[s
     return info
 
 
+def linkedin_headers() -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {require_env('LINKEDIN_ACCESS_TOKEN')}",
+        "Linkedin-Version": os.getenv("LINKEDIN_VERSION", "202605"),
+        "X-Restli-Protocol-Version": "2.0.0",
+        "Content-Type": "application/json",
+        "User-Agent": "bbbb-social-automation/1.0",
+    }
+
+
+def upload_linkedin_image(image_path: Path, owner: str) -> str:
+    initialized, _ = request_json_with_headers(
+        "POST",
+        "https://api.linkedin.com/rest/images?action=initializeUpload",
+        linkedin_headers(),
+        {"initializeUploadRequest": {"owner": owner}},
+    )
+    value = initialized.get("value", {})
+    upload_url = value.get("uploadUrl")
+    image_urn = value.get("image")
+    if not upload_url or not image_urn:
+        raise PublishError(f"LinkedIn image initialization failed: {initialized}")
+
+    request_bytes(
+        "PUT",
+        upload_url,
+        image_path.read_bytes(),
+        {
+            "Authorization": f"Bearer {require_env('LINKEDIN_ACCESS_TOKEN')}",
+            "Content-Type": mimetypes.guess_type(image_path.name)[0] or "application/octet-stream",
+            "User-Agent": "bbbb-social-automation/1.0",
+        },
+    )
+    return image_urn
+
+
+def publish_linkedin_post(image_path: Path, caption: str) -> dict[str, Any]:
+    author = require_env("LINKEDIN_AUTHOR_URN")
+    image_urn = upload_linkedin_image(image_path, author)
+    payload = {
+        "author": author,
+        "commentary": caption,
+        "visibility": "PUBLIC",
+        "distribution": {
+            "feedDistribution": "MAIN_FEED",
+            "targetEntities": [],
+            "thirdPartyDistributionChannels": [],
+        },
+        "content": {"media": {"id": image_urn, "title": image_path.stem}},
+        "lifecycleState": "PUBLISHED",
+        "isReshareDisabledByAuthor": False,
+    }
+    response, headers = request_json_with_headers(
+        "POST",
+        "https://api.linkedin.com/rest/posts",
+        linkedin_headers(),
+        payload,
+    )
+    post_id = next((value for key, value in headers.items() if key.lower() == "x-restli-id"), None)
+    return {"id": post_id, "response": response, "image": image_urn}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--carousel-dir", required=True)
     parser.add_argument("--public-base-url", required=True)
     parser.add_argument("--instagram-caption", required=True)
     parser.add_argument("--facebook-caption", required=True)
+    parser.add_argument("--linkedin-caption")
     parser.add_argument("--out", required=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -201,6 +296,10 @@ def main() -> int:
         "instagram_caption_length": len(Path(args.instagram_caption).read_text(encoding="utf-8")),
         "facebook_caption_length": len(Path(args.facebook_caption).read_text(encoding="utf-8")),
     }
+    linkedin_caption = None
+    if args.linkedin_caption:
+        linkedin_caption = Path(args.linkedin_caption).read_text(encoding="utf-8").strip()
+        payload["linkedin_caption_length"] = len(linkedin_caption)
     if not args.dry_run:
         payload["instagram"] = publish_instagram_carousel(
             image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
@@ -208,6 +307,8 @@ def main() -> int:
         payload["facebook"] = publish_facebook_multiphoto(
             image_paths, Path(args.facebook_caption).read_text(encoding="utf-8").strip()
         )
+        if linkedin_caption:
+            payload["linkedin"] = publish_linkedin_post(image_paths[0], linkedin_caption)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

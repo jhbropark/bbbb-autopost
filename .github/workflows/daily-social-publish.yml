@@ -30,6 +30,9 @@ jobs:
       FACEBOOK_PAGE_ACCESS_TOKEN: ${{ secrets.FACEBOOK_PAGE_ACCESS_TOKEN }}
       FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
       INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+      LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+      LINKEDIN_AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
+      LINKEDIN_VERSION: ${{ secrets.LINKEDIN_VERSION || '202605' }}
       TZ: Asia/Seoul
 
     steps:
@@ -83,6 +86,7 @@ jobs:
             --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --linkedin-caption "${CONTENT_DIR}/linkedin-post.txt" \
             --out "${CONTENT_DIR}/github-actions-publish-results.json"
 
       - name: Validate publish inputs only
@@ -93,6 +97,7 @@ jobs:
             --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --linkedin-caption "${CONTENT_DIR}/linkedin-post.txt" \
             --out "${CONTENT_DIR}/github-actions-publish-results.json" \
             --dry-run
 
