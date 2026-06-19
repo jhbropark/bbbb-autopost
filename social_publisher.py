@@ -194,13 +194,13 @@ def discover_linkedin() -> list[dict[str, Any]]:
     token = require_env("LINKEDIN_ACCESS_TOKEN")
     response, _ = request_json(
         "GET",
-        "https://api.linkedin.com/v2/me",
+        "https://api.linkedin.com/v2/userinfo",
         headers={
             "Authorization": f"Bearer {token}",
             "X-Restli-Protocol-Version": "2.0.0",
         },
     )
-    person_id = response.get("id")
+    person_id = response.get("sub") or response.get("id")
     if not person_id:
         raise PublisherError(f"LinkedIn did not return a person ID: {response}")
     return [
@@ -211,6 +211,7 @@ def discover_linkedin() -> list[dict[str, Any]]:
             "name": " ".join(
                 value
                 for value in (
+                    response.get("name"),
                     response.get("localizedFirstName"),
                     response.get("localizedLastName"),
                 )
