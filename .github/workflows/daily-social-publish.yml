@@ -51,14 +51,16 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Generate content
-        run: python create_2026_06_16_moa_post.py
+        run: python create_2026_06_19_beauty_myth_lab_post.py
 
       - name: Prepare GitHub Pages asset folder
         shell: bash
         run: |
-          PUBLIC_PATH="social/${GITHUB_RUN_ID}/moa"
+          CONTENT_DIR="artifacts/2026-06-19-beauty-myth-lab"
+          PUBLIC_PATH="social/${GITHUB_RUN_ID}/beauty-myth-lab"
           mkdir -p "_site/${PUBLIC_PATH}"
-          cp artifacts/2026-06-16-moa-visualization/carousel/*.png "_site/${PUBLIC_PATH}/"
+          cp "${CONTENT_DIR}/carousel/"*.png "_site/${PUBLIC_PATH}/"
+          echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
           echo "PUBLIC_PATH=${PUBLIC_PATH}" >> "$GITHUB_ENV"
 
       - name: Configure Pages
@@ -77,25 +79,25 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
           python scripts/meta_publish.py \
-            --carousel-dir artifacts/2026-06-16-moa-visualization/carousel \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
             --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
-            --instagram-caption artifacts/2026-06-16-moa-visualization/instagram-caption.txt \
-            --facebook-caption artifacts/2026-06-16-moa-visualization/facebook-caption.txt \
-            --out artifacts/2026-06-16-moa-visualization/github-actions-publish-results.json
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --out "${CONTENT_DIR}/github-actions-publish-results.json"
 
       - name: Validate publish inputs only
         if: ${{ github.event.inputs.dry_run == 'true' }}
         run: |
           python scripts/meta_publish.py \
-            --carousel-dir artifacts/2026-06-16-moa-visualization/carousel \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
             --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
-            --instagram-caption artifacts/2026-06-16-moa-visualization/instagram-caption.txt \
-            --facebook-caption artifacts/2026-06-16-moa-visualization/facebook-caption.txt \
-            --out artifacts/2026-06-16-moa-visualization/github-actions-publish-results.json \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --out "${CONTENT_DIR}/github-actions-publish-results.json" \
             --dry-run
 
       - name: Upload publish log
         uses: actions/upload-artifact@v4
         with:
           name: publish-log
-          path: artifacts/2026-06-16-moa-visualization/github-actions-publish-results.json
+          path: artifacts/2026-06-19-beauty-myth-lab/github-actions-publish-results.json
