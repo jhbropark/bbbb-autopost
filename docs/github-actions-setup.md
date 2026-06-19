@@ -26,7 +26,14 @@ INSTAGRAM_ACCOUNT_ID=17841424189525618
 LINKEDIN_ACCESS_TOKEN=...
 LINKEDIN_AUTHOR_URN=urn:li:person:...
 LINKEDIN_VERSION=202605
+X_API_KEY=...
+X_API_KEY_SECRET=...
+X_OAUTH1_ACCESS_TOKEN=...
+X_OAUTH1_ACCESS_TOKEN_SECRET=...
 X_ACCESS_TOKEN=...
+X_REFRESH_TOKEN=...
+X_CLIENT_ID=...
+X_CLIENT_SECRET=...
 ```
 
 Do not store these values in committed files.
@@ -71,7 +78,20 @@ w_member_social
 For an organization page, use `w_organization_social` and set `LINKEDIN_AUTHOR_URN` to
 `urn:li:organization:{id}`. For a personal profile, use `urn:li:person:{id}`.
 
-Minimum X OAuth 2.0 user token scopes:
+Recommended X credentials for scheduled publishing:
+
+```text
+X_API_KEY
+X_API_KEY_SECRET
+X_OAUTH1_ACCESS_TOKEN
+X_OAUTH1_ACCESS_TOKEN_SECRET
+```
+
+Use OAuth 1.0a tokens with Read and Write permission for durable scheduled posting.
+OAuth 2.0 access tokens expire, so they are only a fallback unless refresh handling is
+managed separately.
+
+Minimum X OAuth 2.0 user token scopes, if OAuth 2.0 is used:
 
 ```text
 tweet.read

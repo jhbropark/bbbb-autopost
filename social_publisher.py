@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
+import secrets
 import sys
 import time
 import uuid
@@ -14,6 +18,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
+from urllib.parse import parse_qsl, quote, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
@@ -365,7 +370,66 @@ def publish_linkedin(text: str, image_path: Path | None) -> dict[str, Any]:
     return {"id": post_id, "response": response}
 
 
-def x_headers(content_type: str = "application/json") -> dict[str, str]:
+def oauth_quote(value: str) -> str:
+    return quote(value, safe="~-._")
+
+
+def x_oauth1_available() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in (
+            "X_API_KEY",
+            "X_API_KEY_SECRET",
+            "X_OAUTH1_ACCESS_TOKEN",
+            "X_OAUTH1_ACCESS_TOKEN_SECRET",
+        )
+    )
+
+
+def x_oauth1_header(method: str, url: str, params: dict[str, str] | None = None) -> str:
+    api_key = require_env("X_API_KEY")
+    api_secret = require_env("X_API_KEY_SECRET")
+    access_token = require_env("X_OAUTH1_ACCESS_TOKEN")
+    access_secret = require_env("X_OAUTH1_ACCESS_TOKEN_SECRET")
+    split = urlsplit(url)
+    base_url = urlunsplit((split.scheme, split.netloc, split.path, "", ""))
+    oauth_params = {
+        "oauth_consumer_key": api_key,
+        "oauth_nonce": secrets.token_urlsafe(24),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(int(time.time())),
+        "oauth_token": access_token,
+        "oauth_version": "1.0",
+    }
+    signature_params = dict(oauth_params)
+    signature_params.update({key: value for key, value in parse_qsl(split.query)})
+    signature_params.update(params or {})
+    param_string = "&".join(
+        f"{oauth_quote(str(key))}={oauth_quote(str(value))}"
+        for key, value in sorted(signature_params.items())
+    )
+    base_string = "&".join(
+        [method.upper(), oauth_quote(base_url), oauth_quote(param_string)]
+    )
+    signing_key = f"{oauth_quote(api_secret)}&{oauth_quote(access_secret)}"
+    signature = base64.b64encode(
+        hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
+    ).decode()
+    oauth_params["oauth_signature"] = signature
+    return "OAuth " + ", ".join(
+        f'{oauth_quote(key)}="{oauth_quote(value)}"'
+        for key, value in sorted(oauth_params.items())
+    )
+
+
+def x_headers(
+    method: str, url: str, content_type: str = "application/json", params: dict[str, str] | None = None
+) -> dict[str, str]:
+    if x_oauth1_available():
+        return {
+            "Authorization": x_oauth1_header(method, url, params),
+            "Content-Type": content_type,
+        }
     return {
         "Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}",
         "Content-Type": content_type,
@@ -374,10 +438,15 @@ def x_headers(content_type: str = "application/json") -> dict[str, str]:
 
 def discover_x() -> list[dict[str, Any]]:
     query = urlencode({"user.fields": "id,name,username"})
+    url = f"https://api.x.com/2/users/me?{query}"
     response, _ = request_json(
         "GET",
-        f"https://api.x.com/2/users/me?{query}",
-        headers={"Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}"},
+        url,
+        headers=(
+            {"Authorization": x_oauth1_header("GET", url)}
+            if x_oauth1_available()
+            else {"Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}"}
+        ),
     )
     user = response.get("data", {})
     if not user.get("id"):
@@ -393,6 +462,25 @@ def discover_x() -> list[dict[str, Any]]:
 
 
 def upload_x_image(image_path: Path) -> str:
+    if x_oauth1_available():
+        url = "https://upload.twitter.com/1.1/media/upload.json"
+        body, boundary = multipart_body(
+            {"media_category": "tweet_image"}, "media", image_path
+        )
+        response, _ = request_json(
+            "POST",
+            url,
+            headers={
+                "Authorization": x_oauth1_header("POST", url),
+                "Content-Type": f"multipart/form-data; boundary={boundary}",
+            },
+            raw_body=body,
+        )
+        media_id = response.get("media_id_string") or response.get("media_id")
+        if not media_id:
+            raise PublisherError(f"X media upload did not return an ID: {response}")
+        return str(media_id)
+
     body, boundary = multipart_body(
         {
             "media_category": "tweet_image",
@@ -407,7 +495,11 @@ def upload_x_image(image_path: Path) -> str:
     response, _ = request_json(
         "POST",
         "https://api.x.com/2/media/upload",
-        headers=x_headers(f"multipart/form-data; boundary={boundary}"),
+        headers=x_headers(
+            "POST",
+            "https://api.x.com/2/media/upload",
+            f"multipart/form-data; boundary={boundary}",
+        ),
         raw_body=body,
     )
     data = response.get("data", {})
@@ -423,8 +515,8 @@ def publish_x(text: str, image_path: Path | None) -> dict[str, Any]:
         payload["media"] = {"media_ids": [upload_x_image(image_path)]}
     response, _ = request_json(
         "POST",
-        "https://api.x.com/2/tweets",
-        headers=x_headers(),
+        url := "https://api.x.com/2/tweets",
+        headers=x_headers("POST", url),
         data=payload,
     )
     tweet = response.get("data", {})
@@ -476,6 +568,14 @@ def configured_channels() -> dict[str, dict[str, str]]:
         },
         "x": {
             "X_ACCESS_TOKEN": os.getenv("X_ACCESS_TOKEN", ""),
+        },
+        "x_oauth1": {
+            "X_API_KEY": os.getenv("X_API_KEY", ""),
+            "X_API_KEY_SECRET": os.getenv("X_API_KEY_SECRET", ""),
+            "X_OAUTH1_ACCESS_TOKEN": os.getenv("X_OAUTH1_ACCESS_TOKEN", ""),
+            "X_OAUTH1_ACCESS_TOKEN_SECRET": os.getenv(
+                "X_OAUTH1_ACCESS_TOKEN_SECRET", ""
+            ),
         },
     }
 

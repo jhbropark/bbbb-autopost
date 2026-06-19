@@ -4,15 +4,19 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
+import secrets
 import time
 import uuid
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
 
@@ -274,15 +278,96 @@ def publish_linkedin_post(image_path: Path, caption: str) -> dict[str, Any]:
     return {"id": post_id, "response": response, "image": image_urn}
 
 
-def x_headers(content_type: str = "application/json") -> dict[str, str]:
+def oauth_quote(value: str) -> str:
+    return quote(value, safe="~-._")
+
+
+def x_oauth1_available() -> bool:
+    return all(
+        os.getenv(name, "").strip()
+        for name in (
+            "X_API_KEY",
+            "X_API_KEY_SECRET",
+            "X_OAUTH1_ACCESS_TOKEN",
+            "X_OAUTH1_ACCESS_TOKEN_SECRET",
+        )
+    )
+
+
+def x_oauth1_header(method: str, url: str, params: dict[str, str] | None = None) -> str:
+    api_key = require_env("X_API_KEY")
+    api_secret = require_env("X_API_KEY_SECRET")
+    access_token = require_env("X_OAUTH1_ACCESS_TOKEN")
+    access_secret = require_env("X_OAUTH1_ACCESS_TOKEN_SECRET")
+    split = urlsplit(url)
+    base_url = urlunsplit((split.scheme, split.netloc, split.path, "", ""))
+    oauth_params = {
+        "oauth_consumer_key": api_key,
+        "oauth_nonce": secrets.token_urlsafe(24),
+        "oauth_signature_method": "HMAC-SHA1",
+        "oauth_timestamp": str(int(time.time())),
+        "oauth_token": access_token,
+        "oauth_version": "1.0",
+    }
+    signature_params = dict(oauth_params)
+    signature_params.update({key: value for key, value in parse_qsl(split.query)})
+    signature_params.update(params or {})
+    param_string = "&".join(
+        f"{oauth_quote(str(key))}={oauth_quote(str(value))}"
+        for key, value in sorted(signature_params.items())
+    )
+    base_string = "&".join([method.upper(), oauth_quote(base_url), oauth_quote(param_string)])
+    signing_key = f"{oauth_quote(api_secret)}&{oauth_quote(access_secret)}"
+    oauth_params["oauth_signature"] = base64.b64encode(
+        hmac.new(signing_key.encode(), base_string.encode(), hashlib.sha1).digest()
+    ).decode()
+    return "OAuth " + ", ".join(
+        f'{oauth_quote(key)}="{oauth_quote(value)}"'
+        for key, value in sorted(oauth_params.items())
+    )
+
+
+def x_headers(
+    method: str, url: str, content_type: str = "application/json", params: dict[str, str] | None = None
+) -> dict[str, str]:
+    auth = (
+        x_oauth1_header(method, url, params)
+        if x_oauth1_available()
+        else f"Bearer {require_env('X_ACCESS_TOKEN')}"
+    )
     return {
-        "Authorization": f"Bearer {require_env('X_ACCESS_TOKEN')}",
+        "Authorization": auth,
         "Content-Type": content_type,
         "User-Agent": "bbbb-social-automation/1.0",
     }
 
 
 def upload_x_image(image_path: Path) -> str:
+    if x_oauth1_available():
+        url = "https://upload.twitter.com/1.1/media/upload.json"
+        body, boundary = multipart_body(
+            {"media_category": "tweet_image"}, "media", image_path
+        )
+        request = Request(
+            url,
+            data=body,
+            headers=x_headers("POST", url, f"multipart/form-data; boundary={boundary}"),
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=120) as result:
+                payload = result.read()
+                response = json.loads(payload.decode("utf-8")) if payload else {}
+        except HTTPError as error:
+            payload = error.read().decode("utf-8", errors="replace")
+            raise PublishError(f"POST {url} failed HTTP {error.code}: {payload}") from error
+        except URLError as error:
+            raise PublishError(f"POST {url} failed: {error.reason}") from error
+        media_id = response.get("media_id_string") or response.get("media_id")
+        if not media_id:
+            raise PublishError(f"X media upload did not return an ID: {response}")
+        return str(media_id)
+
     body, boundary = multipart_body(
         {
             "media_category": "tweet_image",
@@ -294,7 +379,11 @@ def upload_x_image(image_path: Path) -> str:
     request = Request(
         "https://api.x.com/2/media/upload",
         data=body,
-        headers=x_headers(f"multipart/form-data; boundary={boundary}"),
+        headers=x_headers(
+            "POST",
+            "https://api.x.com/2/media/upload",
+            f"multipart/form-data; boundary={boundary}",
+        ),
         method="POST",
     )
     try:
@@ -321,8 +410,8 @@ def create_x_post(caption: str, media_id: str | None = None, reply_to: str | Non
         body["reply"] = {"in_reply_to_tweet_id": reply_to}
     response, _ = request_json_with_headers(
         "POST",
-        "https://api.x.com/2/tweets",
-        x_headers(),
+        url := "https://api.x.com/2/tweets",
+        x_headers("POST", url),
         body,
     )
     return response
