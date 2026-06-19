@@ -313,14 +313,24 @@ def upload_x_image(image_path: Path) -> str:
     return str(media_id)
 
 
-def publish_x_post(image_path: Path, caption: str) -> dict[str, Any]:
-    media_id = upload_x_image(image_path)
+def create_x_post(caption: str, media_id: str | None = None, reply_to: str | None = None) -> dict[str, Any]:
+    body: dict[str, Any] = {"text": caption}
+    if media_id:
+        body["media"] = {"media_ids": [media_id]}
+    if reply_to:
+        body["reply"] = {"in_reply_to_tweet_id": reply_to}
     response, _ = request_json_with_headers(
         "POST",
         "https://api.x.com/2/tweets",
         x_headers(),
-        {"text": caption, "media": {"media_ids": [media_id]}},
+        body,
     )
+    return response
+
+
+def publish_x_post(caption: str, image_path: Path | None = None) -> dict[str, Any]:
+    media_id = upload_x_image(image_path) if image_path else None
+    response = create_x_post(caption, media_id)
     tweet = response.get("data", {})
     return {
         "id": tweet.get("id"),
@@ -328,6 +338,37 @@ def publish_x_post(image_path: Path, caption: str) -> dict[str, Any]:
         "response": response,
         "image": media_id,
     }
+
+
+def read_x_thread(path: Path) -> list[str]:
+    raw = path.read_text(encoding="utf-8").strip()
+    posts = [part.strip() for part in raw.split("\n---\n") if part.strip()]
+    if not posts:
+        raise PublishError(f"X thread file is empty: {path}")
+    for index, post in enumerate(posts, 1):
+        if len(post) > 280:
+            raise PublishError(f"X thread post {index} exceeds 280 characters: {len(post)}")
+    return posts
+
+
+def publish_x_thread(posts: list[str]) -> dict[str, Any]:
+    published = []
+    previous_id = None
+    for post in posts:
+        response = create_x_post(post, reply_to=previous_id)
+        tweet = response.get("data", {})
+        tweet_id = tweet.get("id")
+        if not tweet_id:
+            raise PublishError(f"X thread post did not return an ID: {response}")
+        published.append(
+            {
+                "id": tweet_id,
+                "url": f"https://x.com/i/web/status/{tweet_id}",
+                "response": response,
+            }
+        )
+        previous_id = tweet_id
+    return {"posts": published, "url": published[0]["url"]}
 
 
 def main() -> int:
@@ -338,6 +379,13 @@ def main() -> int:
     parser.add_argument("--facebook-caption", required=True)
     parser.add_argument("--linkedin-caption")
     parser.add_argument("--x-caption")
+    parser.add_argument("--x-thread")
+    parser.add_argument(
+        "--x-mode",
+        choices=("auto", "short", "image", "thread"),
+        default="auto",
+        help="X publishing format. auto reads x-mode.txt next to --x-caption.",
+    )
     parser.add_argument("--out", required=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -358,9 +406,23 @@ def main() -> int:
         linkedin_caption = Path(args.linkedin_caption).read_text(encoding="utf-8").strip()
         payload["linkedin_caption_length"] = len(linkedin_caption)
     x_caption = None
+    x_mode = args.x_mode
     if args.x_caption:
-        x_caption = Path(args.x_caption).read_text(encoding="utf-8").strip()
+        x_caption_path = Path(args.x_caption)
+        x_caption = x_caption_path.read_text(encoding="utf-8").strip()
         payload["x_caption_length"] = len(x_caption)
+        mode_path = x_caption_path.with_name("x-mode.txt")
+        if x_mode == "auto" and mode_path.exists():
+            x_mode = mode_path.read_text(encoding="utf-8").strip()
+        elif x_mode == "auto":
+            x_mode = "image"
+        if x_mode not in {"short", "image", "thread"}:
+            raise PublishError(f"Unsupported X mode: {x_mode}")
+        payload["x_mode"] = x_mode
+    x_thread_posts = None
+    if args.x_thread:
+        x_thread_posts = read_x_thread(Path(args.x_thread))
+        payload["x_thread_count"] = len(x_thread_posts)
     if not args.dry_run:
         payload["instagram"] = publish_instagram_carousel(
             image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
@@ -371,7 +433,14 @@ def main() -> int:
         if linkedin_caption:
             payload["linkedin"] = publish_linkedin_post(image_paths[0], linkedin_caption)
         if x_caption:
-            payload["x"] = publish_x_post(image_paths[0], x_caption)
+            if x_mode == "short":
+                payload["x"] = publish_x_post(x_caption)
+            elif x_mode == "image":
+                payload["x"] = publish_x_post(x_caption, image_paths[0])
+            elif x_mode == "thread":
+                if not x_thread_posts:
+                    raise PublishError("X mode is thread but --x-thread was not provided.")
+                payload["x"] = publish_x_thread(x_thread_posts)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
