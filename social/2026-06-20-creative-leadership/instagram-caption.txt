@@ -1,0 +1,8 @@
+좋은 크리에이티브 팀은 프롬프트보다 리뷰 질문을 먼저 설계합니다.
+
+오늘의 운영 질문 4가지:
+Use Case, Tools, Instructions, Guardrails.
+
+수정된 이미지 레이아웃으로 다시 정리했습니다.
+
+출처: https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/
