@@ -252,9 +252,15 @@ def upload_linkedin_image(image_path: Path, owner: str) -> str:
     return image_urn
 
 
-def publish_linkedin_post(image_path: Path, caption: str) -> dict[str, Any]:
+def publish_linkedin_post(image_paths: list[Path], caption: str) -> dict[str, Any]:
     author = require_env("LINKEDIN_AUTHOR_URN")
-    image_urn = upload_linkedin_image(image_path, author)
+    image_urns = [upload_linkedin_image(path, author) for path in image_paths]
+    if len(image_urns) == 1:
+        content: dict[str, Any] = {
+            "media": {"id": image_urns[0], "title": image_paths[0].stem}
+        }
+    else:
+        content = {"multiImage": {"images": [{"id": image_urn} for image_urn in image_urns]}}
     payload = {
         "author": author,
         "commentary": caption,
@@ -264,7 +270,7 @@ def publish_linkedin_post(image_path: Path, caption: str) -> dict[str, Any]:
             "targetEntities": [],
             "thirdPartyDistributionChannels": [],
         },
-        "content": {"media": {"id": image_urn, "title": image_path.stem}},
+        "content": content,
         "lifecycleState": "PUBLISHED",
         "isReshareDisabledByAuthor": False,
     }
@@ -275,7 +281,7 @@ def publish_linkedin_post(image_path: Path, caption: str) -> dict[str, Any]:
         payload,
     )
     post_id = next((value for key, value in headers.items() if key.lower() == "x-restli-id"), None)
-    return {"id": post_id, "response": response, "image": image_urn}
+    return {"id": post_id, "response": response, "images": image_urns}
 
 
 def oauth_quote(value: str) -> str:
@@ -467,6 +473,11 @@ def main() -> int:
     parser.add_argument("--instagram-caption", required=True)
     parser.add_argument("--facebook-caption", required=True)
     parser.add_argument("--linkedin-caption")
+    parser.add_argument(
+        "--channels",
+        default="instagram,facebook,linkedin,x",
+        help="Comma-separated channels to publish. Defaults to all configured channels.",
+    )
     parser.add_argument("--x-caption")
     parser.add_argument("--x-thread")
     parser.add_argument(
@@ -478,6 +489,11 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
+
+    selected_channels = {item.strip() for item in args.channels.split(",") if item.strip()}
+    invalid_channels = selected_channels - {"instagram", "facebook", "linkedin", "x"}
+    if invalid_channels:
+        raise PublishError(f"Unsupported channels: {', '.join(sorted(invalid_channels))}")
 
     carousel_dir = Path(args.carousel_dir)
     image_paths = sorted(carousel_dir.glob("*.png"))
@@ -513,15 +529,17 @@ def main() -> int:
         x_thread_posts = read_x_thread(Path(args.x_thread))
         payload["x_thread_count"] = len(x_thread_posts)
     if not args.dry_run:
-        payload["instagram"] = publish_instagram_carousel(
-            image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
-        )
-        payload["facebook"] = publish_facebook_multiphoto(
-            image_paths, Path(args.facebook_caption).read_text(encoding="utf-8").strip()
-        )
-        if linkedin_caption:
-            payload["linkedin"] = publish_linkedin_post(image_paths[0], linkedin_caption)
-        if x_caption:
+        if "instagram" in selected_channels:
+            payload["instagram"] = publish_instagram_carousel(
+                image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
+            )
+        if "facebook" in selected_channels:
+            payload["facebook"] = publish_facebook_multiphoto(
+                image_paths, Path(args.facebook_caption).read_text(encoding="utf-8").strip()
+            )
+        if "linkedin" in selected_channels and linkedin_caption:
+            payload["linkedin"] = publish_linkedin_post(image_paths, linkedin_caption)
+        if "x" in selected_channels and x_caption:
             if x_mode == "short":
                 payload["x"] = publish_x_post(x_caption)
             elif x_mode == "image":
