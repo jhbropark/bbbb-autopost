@@ -92,8 +92,15 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Publish to Meta and LinkedIn
+      - name: Prevent duplicate cross-channel publish
+        id: duplicate-check
         if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          python scripts/prevent_duplicate_instagram_publish.py \
+            --caption "${CONTENT_DIR}/instagram-caption.txt"
+
+      - name: Publish to Meta and LinkedIn
+        if: ${{ github.event.inputs.dry_run != 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
         run: |
           python scripts/meta_publish.py \
             --carousel-dir "${CONTENT_DIR}/carousel" \
