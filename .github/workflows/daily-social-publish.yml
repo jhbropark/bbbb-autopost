@@ -58,22 +58,24 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Generate content
-        run: python create_2026_06_19_beauty_myth_lab_post.py
+      - name: Generate date-specific content
+        run: |
+          CONTENT_DIR="$(python scripts/generate_daily_content.py --date "$(date +%F)")"
+          echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
+          echo "CONTENT_SLUG=$(basename "${CONTENT_DIR}")" >> "$GITHUB_ENV"
 
       - name: Build X browser publishing handoff
         run: |
           python scripts/x_browser_handoff.py \
-            --caption "artifacts/2026-06-19-beauty-myth-lab/x-post.txt" \
-            --thread "artifacts/2026-06-19-beauty-myth-lab/x-thread.txt" \
-            --carousel-dir "artifacts/2026-06-19-beauty-myth-lab/carousel" \
-            --out "artifacts/2026-06-19-beauty-myth-lab/x-browser-handoff.html"
+            --caption "${CONTENT_DIR}/x-post.txt" \
+            --thread "${CONTENT_DIR}/x-thread.txt" \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --out "${CONTENT_DIR}/x-browser-handoff.html"
 
       - name: Prepare GitHub Pages asset folder
         shell: bash
         run: |
-          CONTENT_DIR="artifacts/2026-06-19-beauty-myth-lab"
-          PUBLIC_PATH="social/${GITHUB_RUN_ID}/beauty-myth-lab"
+          PUBLIC_PATH="social/${GITHUB_RUN_ID}/${CONTENT_SLUG}"
           mkdir -p "_site/${PUBLIC_PATH}"
           cp "${CONTENT_DIR}/carousel/"*.png "_site/${PUBLIC_PATH}/"
           cp "${CONTENT_DIR}/x-browser-handoff.html" "_site/${PUBLIC_PATH}/"
@@ -126,4 +128,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: publish-log
-          path: artifacts/2026-06-19-beauty-myth-lab/github-actions-publish-results.json
+          path: ${{ env.CONTENT_DIR }}/github-actions-publish-results.json
