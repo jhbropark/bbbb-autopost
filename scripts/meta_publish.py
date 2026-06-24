@@ -36,6 +36,12 @@ def graph_base() -> str:
     return f"https://graph.facebook.com/{version}"
 
 
+def safe_url(url: str) -> str:
+    parts = urlsplit(url)
+    query = [(key, value) for key, value in parse_qsl(parts.query, keep_blank_values=True) if key != "access_token"]
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
 def request_json(method: str, url: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
     body = urlencode(data).encode("utf-8") if data else None
     headers = {"User-Agent": "bbbb-social-automation/1.0"}
@@ -48,7 +54,7 @@ def request_json(method: str, url: str, data: dict[str, Any] | None = None) -> d
             return json.loads(payload.decode("utf-8")) if payload else {}
     except HTTPError as error:
         payload = error.read().decode("utf-8", errors="replace")
-        raise PublishError(f"{method} {url} failed HTTP {error.code}: {payload}") from error
+        raise PublishError(f"{method} {safe_url(url)} failed HTTP {error.code}: {payload}") from error
     except URLError as error:
         raise PublishError(f"{method} {url} failed: {error.reason}") from error
 
@@ -68,7 +74,7 @@ def request_json_with_headers(
             return parsed, dict(response.headers.items())
     except HTTPError as error:
         payload = error.read().decode("utf-8", errors="replace")
-        raise PublishError(f"{method} {url} failed HTTP {error.code}: {payload}") from error
+        raise PublishError(f"{method} {safe_url(url)} failed HTTP {error.code}: {payload}") from error
     except URLError as error:
         raise PublishError(f"{method} {url} failed: {error.reason}") from error
 
@@ -466,6 +472,21 @@ def publish_x_thread(posts: list[str]) -> dict[str, Any]:
     return {"posts": published, "url": published[0]["url"]}
 
 
+def is_instagram_action_block(error: Exception) -> bool:
+    message = str(error)
+    return "error_subcode\":2207051" in message or "Application request limit reached" in message
+
+
+def publish_channel(payload: dict[str, Any], channel: str, callback: Any) -> None:
+    try:
+        payload[channel] = callback()
+    except PublishError as error:
+        payload.setdefault("errors", {})[channel] = {
+            "message": str(error),
+            "action_blocked": channel == "instagram" and is_instagram_action_block(error),
+        }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--carousel-dir", required=True)
@@ -488,6 +509,11 @@ def main() -> int:
     )
     parser.add_argument("--out", required=True)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--allow-failures",
+        action="store_true",
+        help="Write per-channel errors to the output JSON without failing the process.",
+    )
     args = parser.parse_args()
 
     selected_channels = {item.strip() for item in args.channels.split(",") if item.strip()}
@@ -530,28 +556,42 @@ def main() -> int:
         payload["x_thread_count"] = len(x_thread_posts)
     if not args.dry_run:
         if "instagram" in selected_channels:
-            payload["instagram"] = publish_instagram_carousel(
-                image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
+            publish_channel(
+                payload,
+                "instagram",
+                lambda: publish_instagram_carousel(
+                    image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
+                ),
             )
         if "facebook" in selected_channels:
-            payload["facebook"] = publish_facebook_multiphoto(
-                image_paths, Path(args.facebook_caption).read_text(encoding="utf-8").strip()
+            publish_channel(
+                payload,
+                "facebook",
+                lambda: publish_facebook_multiphoto(
+                    image_paths, Path(args.facebook_caption).read_text(encoding="utf-8").strip()
+                ),
             )
         if "linkedin" in selected_channels and linkedin_caption:
-            payload["linkedin"] = publish_linkedin_post(image_paths, linkedin_caption)
+            publish_channel(payload, "linkedin", lambda: publish_linkedin_post(image_paths, linkedin_caption))
         if "x" in selected_channels and x_caption:
-            if x_mode == "short":
-                payload["x"] = publish_x_post(x_caption)
-            elif x_mode == "image":
-                payload["x"] = publish_x_post(x_caption, image_paths[0])
-            elif x_mode == "thread":
-                if not x_thread_posts:
-                    raise PublishError("X mode is thread but --x-thread was not provided.")
-                payload["x"] = publish_x_thread(x_thread_posts)
+            def publish_x() -> dict[str, Any]:
+                if x_mode == "short":
+                    return publish_x_post(x_caption)
+                if x_mode == "image":
+                    return publish_x_post(x_caption, image_paths[0])
+                if x_mode == "thread":
+                    if not x_thread_posts:
+                        raise PublishError("X mode is thread but --x-thread was not provided.")
+                    return publish_x_thread(x_thread_posts)
+                raise PublishError(f"Unsupported X mode: {x_mode}")
+
+            publish_channel(payload, "x", publish_x)
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if payload.get("errors") and not args.allow_failures:
+        raise SystemExit(1)
     return 0
 
 

@@ -38,6 +38,7 @@ jobs:
       X_API_KEY_SECRET: ${{ secrets.X_API_KEY_SECRET }}
       X_OAUTH1_ACCESS_TOKEN: ${{ secrets.X_OAUTH1_ACCESS_TOKEN }}
       X_OAUTH1_ACCESS_TOKEN_SECRET: ${{ secrets.X_OAUTH1_ACCESS_TOKEN_SECRET }}
+      INSTAGRAM_COOLDOWN_UNTIL: ${{ vars.INSTAGRAM_COOLDOWN_UNTIL }}
       TZ: Asia/Seoul
 
     steps:
@@ -94,15 +95,43 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Prevent duplicate cross-channel publish
-        id: duplicate-check
+      - name: Check Instagram cooldown
+        id: instagram-cooldown
         if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: python scripts/instagram_cooldown.py
+
+      - name: Prevent duplicate Instagram publish
+        id: duplicate-check
+        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' }}
         run: |
           python scripts/prevent_duplicate_instagram_publish.py \
             --caption "${CONTENT_DIR}/instagram-caption.txt"
 
-      - name: Publish to Meta and LinkedIn
-        if: ${{ github.event.inputs.dry_run != 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
+      - name: Publish Instagram
+        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --channels instagram \
+            --out "${CONTENT_DIR}/instagram-publish-results.json" \
+            --allow-failures
+
+      - name: Publish Facebook
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --channels facebook \
+            --out "${CONTENT_DIR}/facebook-publish-results.json"
+
+      - name: Publish LinkedIn
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |
           python scripts/meta_publish.py \
             --carousel-dir "${CONTENT_DIR}/carousel" \
@@ -110,7 +139,8 @@ jobs:
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
             --linkedin-caption "${CONTENT_DIR}/linkedin-post.txt" \
-            --out "${CONTENT_DIR}/github-actions-publish-results.json"
+            --channels linkedin \
+            --out "${CONTENT_DIR}/linkedin-publish-results.json"
 
       - name: Validate publish inputs only
         if: ${{ github.event.inputs.dry_run == 'true' }}
@@ -128,4 +158,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: publish-log
-          path: ${{ env.CONTENT_DIR }}/github-actions-publish-results.json
+          path: ${{ env.CONTENT_DIR }}/*-publish-results.json
