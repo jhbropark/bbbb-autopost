@@ -119,6 +119,54 @@ jobs:
             --out "${CONTENT_DIR}/instagram-publish-results.json" \
             --allow-failures
 
+      - name: Record Instagram cooldown skip
+        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'false' }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          out = Path(os.environ["CONTENT_DIR"]) / "instagram-publish-results.json"
+          payload = {
+              "instagram": {
+                  "status": "skipped",
+                  "reason": os.environ.get("INSTAGRAM_SKIP_REASON") or "instagram_activity_cooldown",
+                  "cooldown_until": os.environ.get("INSTAGRAM_COOLDOWN_UNTIL", ""),
+              }
+          }
+          out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(json.dumps(payload, ensure_ascii=False, indent=2))
+          PY
+        env:
+          INSTAGRAM_SKIP_REASON: ${{ steps.instagram-cooldown.outputs.reason }}
+
+      - name: Record Instagram duplicate skip
+        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'false' }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          out = Path(os.environ["CONTENT_DIR"]) / "instagram-publish-results.json"
+          payload = {
+              "instagram": {
+                  "status": "skipped",
+                  "reason": "duplicate_caption",
+                  "duplicate_permalink": os.environ.get("INSTAGRAM_DUPLICATE_PERMALINK", ""),
+                  "duplicate_timestamp": os.environ.get("INSTAGRAM_DUPLICATE_TIMESTAMP", ""),
+              }
+          }
+          out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+          print(json.dumps(payload, ensure_ascii=False, indent=2))
+          PY
+        env:
+          INSTAGRAM_DUPLICATE_PERMALINK: ${{ steps.duplicate-check.outputs.duplicate_permalink }}
+          INSTAGRAM_DUPLICATE_TIMESTAMP: ${{ steps.duplicate-check.outputs.duplicate_timestamp }}
+
       - name: Publish Facebook
         if: ${{ github.event.inputs.dry_run != 'true' }}
         run: |

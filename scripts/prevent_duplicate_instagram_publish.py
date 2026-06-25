@@ -15,11 +15,17 @@ def normalize(value: str) -> str:
     return "\n".join(line.strip() for line in value.strip().splitlines() if line.strip())
 
 
-def write_output(should_publish: bool) -> None:
+def write_output(
+    should_publish: bool,
+    duplicate_permalink: str | None = None,
+    duplicate_timestamp: str | None = None,
+) -> None:
     output_path = os.getenv("GITHUB_OUTPUT", "").strip()
     if output_path:
         with Path(output_path).open("a", encoding="utf-8") as handle:
             handle.write(f"should_publish={'true' if should_publish else 'false'}\n")
+            handle.write(f"duplicate_permalink={duplicate_permalink or ''}\n")
+            handle.write(f"duplicate_timestamp={duplicate_timestamp or ''}\n")
 
 
 def main() -> int:
@@ -59,13 +65,15 @@ def main() -> int:
         None,
     )
     should_publish = duplicate is None
-    write_output(should_publish)
+    duplicate_permalink = duplicate.get("permalink") if duplicate else None
+    duplicate_timestamp = duplicate.get("timestamp") if duplicate else None
+    write_output(should_publish, duplicate_permalink, duplicate_timestamp)
     print(
         json.dumps(
             {
                 "should_publish": should_publish,
-                "duplicate_permalink": duplicate.get("permalink") if duplicate else None,
-                "duplicate_timestamp": duplicate.get("timestamp") if duplicate else None,
+                "duplicate_permalink": duplicate_permalink,
+                "duplicate_timestamp": duplicate_timestamp,
             },
             ensure_ascii=False,
         )

@@ -18,14 +18,24 @@ def write_output(name: str, value: str) -> None:
 def main() -> int:
     value = os.getenv("INSTAGRAM_COOLDOWN_UNTIL", "").strip()
     should_publish = True
+    reason = ""
     if value:
         try:
             until = datetime.fromisoformat(value.replace("Z", "+00:00"))
             should_publish = datetime.now(timezone.utc) >= until.astimezone(timezone.utc)
+            if not should_publish:
+                reason = "instagram_activity_cooldown"
         except ValueError:
             should_publish = False
+            reason = "invalid_instagram_cooldown_until"
     write_output("should_publish", "true" if should_publish else "false")
+    write_output("cooldown_until", value)
+    write_output("reason", reason)
     print(f"Instagram publish allowed: {should_publish}")
+    if reason:
+        print(f"Instagram skip reason: {reason}")
+    if value:
+        print(f"Instagram cooldown until: {value}")
     return 0
 
 
