@@ -24,6 +24,10 @@ class PublishError(RuntimeError):
     pass
 
 
+def normalize_text(value: str) -> str:
+    return "\n".join(line.strip() for line in value.strip().splitlines() if line.strip())
+
+
 def require_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
@@ -175,11 +179,21 @@ def publish_instagram_carousel(image_urls: list[str], caption: str) -> dict[str,
         time.sleep(5)
     else:
         raise PublishError("Instagram carousel container timed out.")
-    result = request_json(
-        "POST",
-        f"{graph_base()}/{account_id}/media_publish",
-        {"creation_id": creation_id, "access_token": token},
-    )
+    try:
+        result = request_json(
+            "POST",
+            f"{graph_base()}/{account_id}/media_publish",
+            {"creation_id": creation_id, "access_token": token},
+        )
+    except PublishError as error:
+        if not is_instagram_action_block(error):
+            raise
+        recovered = find_recent_instagram_post(caption, token, account_id)
+        if recovered:
+            recovered["status"] = "published_after_api_error"
+            recovered["warning"] = "media_publish returned an Instagram action-block error after the post was created"
+            return recovered
+        raise
     query = urlencode(
         {
             "fields": "id,permalink,timestamp,media_type",
@@ -187,6 +201,27 @@ def publish_instagram_carousel(image_urls: list[str], caption: str) -> dict[str,
         }
     )
     return request_json("GET", f"{graph_base()}/{result['id']}?{query}")
+
+
+def find_recent_instagram_post(caption: str, token: str, account_id: str) -> dict[str, Any] | None:
+    expected = normalize_text(caption)
+    query = urlencode(
+        {
+            "fields": "id,caption,permalink,timestamp,media_type",
+            "limit": "10",
+            "access_token": token,
+        }
+    )
+    payload = request_json("GET", f"{graph_base()}/{account_id}/media?{query}")
+    for post in payload.get("data", []):
+        if normalize_text(post.get("caption", "")) == expected:
+            return {
+                "id": post.get("id"),
+                "permalink": post.get("permalink"),
+                "timestamp": post.get("timestamp"),
+                "media_type": post.get("media_type"),
+            }
+    return None
 
 
 def publish_facebook_multiphoto(image_paths: list[Path], caption: str) -> dict[str, Any]:

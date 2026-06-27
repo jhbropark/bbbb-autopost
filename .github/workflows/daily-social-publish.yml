@@ -12,7 +12,7 @@ on:
     - cron: "0 0 * * *"
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -73,6 +73,16 @@ jobs:
             --carousel-dir "${CONTENT_DIR}/carousel" \
             --out "${CONTENT_DIR}/x-browser-handoff.html"
 
+      - name: Restore GitHub Pages asset history
+        shell: bash
+        run: |
+          rm -rf _site
+          mkdir -p _site
+          if git ls-remote --exit-code --heads origin pages-history >/dev/null 2>&1; then
+            git fetch origin pages-history --depth=1
+            git --work-tree="_site" checkout FETCH_HEAD -- . || true
+          fi
+
       - name: Prepare GitHub Pages asset folder
         shell: bash
         run: |
@@ -80,6 +90,7 @@ jobs:
           mkdir -p "_site/${PUBLIC_PATH}"
           cp "${CONTENT_DIR}/carousel/"*.png "_site/${PUBLIC_PATH}/"
           cp "${CONTENT_DIR}/x-browser-handoff.html" "_site/${PUBLIC_PATH}/"
+          touch "_site/.nojekyll"
           echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
           echo "PUBLIC_PATH=${PUBLIC_PATH}" >> "$GITHUB_ENV"
 
@@ -94,6 +105,21 @@ jobs:
       - name: Deploy Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Persist GitHub Pages asset history
+        shell: bash
+        run: |
+          cd _site
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B pages-history
+          git add -A
+          git commit -m "docs: update pages asset history" || exit 0
+          git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin pages-history
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Instagram cooldown
         id: instagram-cooldown
