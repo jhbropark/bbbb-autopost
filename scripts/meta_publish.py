@@ -507,6 +507,95 @@ def publish_x_thread(posts: list[str]) -> dict[str, Any]:
     return {"posts": published, "url": published[0]["url"]}
 
 
+def reddit_user_agent() -> str:
+    return os.getenv("REDDIT_USER_AGENT", "").strip() or "windows:bbbb-autopost:v1.0 (by /u/bbbb-autopost)"
+
+
+def reddit_access_token() -> str:
+    client_id = require_env("REDDIT_CLIENT_ID")
+    client_secret = require_env("REDDIT_CLIENT_SECRET")
+    username = require_env("REDDIT_USERNAME")
+    password = require_env("REDDIT_PASSWORD")
+    credentials = base64.b64encode(f"{client_id}:{client_secret}".encode("utf-8")).decode("ascii")
+    request = Request(
+        "https://www.reddit.com/api/v1/access_token",
+        data=urlencode(
+            {
+                "grant_type": "password",
+                "username": username,
+                "password": password,
+            }
+        ).encode("utf-8"),
+        headers={
+            "Authorization": f"Basic {credentials}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": reddit_user_agent(),
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=60) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        payload = error.read().decode("utf-8", errors="replace")
+        raise PublishError(f"POST https://www.reddit.com/api/v1/access_token failed HTTP {error.code}: {payload}") from error
+    except URLError as error:
+        raise PublishError(f"POST https://www.reddit.com/api/v1/access_token failed: {error.reason}") from error
+    token = payload.get("access_token")
+    if not token:
+        raise PublishError(f"Reddit did not return an access token: {payload}")
+    return str(token)
+
+
+def publish_reddit_self_post(title: str, body: str, image_urls: list[str]) -> dict[str, Any]:
+    subreddit = require_env("REDDIT_SUBREDDIT").removeprefix("r/").strip()
+    if not subreddit:
+        raise PublishError("Missing required environment variable: REDDIT_SUBREDDIT")
+    image_section = "\n".join(f"- {url}" for url in image_urls)
+    text = f"{body.strip()}\n\nCarousel images:\n{image_section}".strip()
+    token = reddit_access_token()
+    data = {
+        "sr": subreddit,
+        "kind": "self",
+        "title": title,
+        "text": text,
+        "api_type": "json",
+        "resubmit": "true",
+    }
+    flair_id = os.getenv("REDDIT_FLAIR_ID", "").strip()
+    if flair_id:
+        data["flair_id"] = flair_id
+    request = Request(
+        "https://oauth.reddit.com/api/submit",
+        data=urlencode(data).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": reddit_user_agent(),
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=120) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        payload = error.read().decode("utf-8", errors="replace")
+        raise PublishError(f"POST https://oauth.reddit.com/api/submit failed HTTP {error.code}: {payload}") from error
+    except URLError as error:
+        raise PublishError(f"POST https://oauth.reddit.com/api/submit failed: {error.reason}") from error
+    errors = payload.get("json", {}).get("errors", [])
+    if errors:
+        raise PublishError(f"Reddit submit returned errors: {errors}")
+    data_payload = payload.get("json", {}).get("data", {})
+    return {
+        "id": data_payload.get("id"),
+        "name": data_payload.get("name"),
+        "url": data_payload.get("url"),
+        "subreddit": f"r/{subreddit}",
+        "kind": "self",
+    }
+
+
 def is_instagram_action_block(error: Exception) -> bool:
     message = str(error)
     return "error_subcode\":2207051" in message or "Application request limit reached" in message
@@ -529,9 +618,11 @@ def main() -> int:
     parser.add_argument("--instagram-caption", required=True)
     parser.add_argument("--facebook-caption", required=True)
     parser.add_argument("--linkedin-caption")
+    parser.add_argument("--reddit-title")
+    parser.add_argument("--reddit-post")
     parser.add_argument(
         "--channels",
-        default="instagram,facebook,linkedin,x",
+        default="instagram,facebook,linkedin,x,reddit",
         help="Comma-separated channels to publish. Defaults to all configured channels.",
     )
     parser.add_argument("--x-caption")
@@ -552,7 +643,7 @@ def main() -> int:
     args = parser.parse_args()
 
     selected_channels = {item.strip() for item in args.channels.split(",") if item.strip()}
-    invalid_channels = selected_channels - {"instagram", "facebook", "linkedin", "x"}
+    invalid_channels = selected_channels - {"instagram", "facebook", "linkedin", "x", "reddit"}
     if invalid_channels:
         raise PublishError(f"Unsupported channels: {', '.join(sorted(invalid_channels))}")
 
@@ -571,6 +662,13 @@ def main() -> int:
     if args.linkedin_caption:
         linkedin_caption = Path(args.linkedin_caption).read_text(encoding="utf-8").strip()
         payload["linkedin_caption_length"] = len(linkedin_caption)
+    reddit_title = None
+    reddit_post = None
+    if args.reddit_title and args.reddit_post:
+        reddit_title = Path(args.reddit_title).read_text(encoding="utf-8").strip()
+        reddit_post = Path(args.reddit_post).read_text(encoding="utf-8").strip()
+        payload["reddit_title_length"] = len(reddit_title)
+        payload["reddit_post_length"] = len(reddit_post)
     x_caption = None
     x_mode = args.x_mode
     if args.x_caption:
@@ -621,6 +719,12 @@ def main() -> int:
                 raise PublishError(f"Unsupported X mode: {x_mode}")
 
             publish_channel(payload, "x", publish_x)
+        if "reddit" in selected_channels and reddit_title and reddit_post:
+            publish_channel(
+                payload,
+                "reddit",
+                lambda: publish_reddit_self_post(reddit_title, reddit_post, image_urls),
+            )
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

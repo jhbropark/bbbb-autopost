@@ -376,6 +376,11 @@ def create_package(target_date: date, out_root: Path) -> Path:
     (out / "instagram-caption.txt").write_text(topic.instagram, encoding="utf-8")
     (out / "facebook-caption.txt").write_text(f"{topic.facebook}\n\n참고: 한국경제 기사 기반 시장 신호 분석", encoding="utf-8")
     (out / "linkedin-post.txt").write_text(f"{topic.linkedin}\n\n참고 기사:\n{source_lines}", encoding="utf-8")
+    (out / "reddit-title.txt").write_text(topic.x_post, encoding="utf-8")
+    (out / "reddit-post.txt").write_text(
+        f"{topic.linkedin}\n\n참고 기사:\n{source_lines}",
+        encoding="utf-8",
+    )
     (out / "x-post.txt").write_text(topic.x_post, encoding="utf-8")
     (out / "x-thread.txt").write_text("\n---\n".join((topic.x_post, topic.hook, *topic.checklist[:3])), encoding="utf-8")
     (out / "x-mode.txt").write_text(("short", "image", "thread", "short", "image")[target_date.toordinal() % 5], encoding="utf-8")

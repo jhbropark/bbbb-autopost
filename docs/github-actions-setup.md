@@ -34,6 +34,12 @@ X_ACCESS_TOKEN=...
 X_REFRESH_TOKEN=...
 X_CLIENT_ID=...
 X_CLIENT_SECRET=...
+REDDIT_CLIENT_ID=...
+REDDIT_CLIENT_SECRET=...
+REDDIT_USERNAME=...
+REDDIT_PASSWORD=...
+REDDIT_SUBREDDIT=...
+REDDIT_USER_AGENT=windows:bbbb-autopost:v1.0 (by /u/YOUR_REDDIT_USERNAME)
 ```
 
 Do not store these values in committed files.
@@ -103,6 +109,22 @@ offline.access
 
 Use an X user-context OAuth 2.0 token. App-only bearer tokens cannot create Posts.
 
+Recommended Reddit credentials for scheduled publishing:
+
+```text
+REDDIT_CLIENT_ID
+REDDIT_CLIENT_SECRET
+REDDIT_USERNAME
+REDDIT_PASSWORD
+REDDIT_SUBREDDIT
+REDDIT_USER_AGENT
+```
+
+Create a Reddit app at https://www.reddit.com/prefs/apps and use a script app for
+server-side scheduled posting. The current integration publishes a self post with the
+carousel image URLs hosted on GitHub Pages. Native Reddit image gallery upload is not
+used in this first automation path.
+
 ## What The Workflow Does
 
 `.github/workflows/daily-social-publish.yml` runs daily at `09:00 KST`.
@@ -117,7 +139,8 @@ Steps:
 6. Publish a Facebook multi-photo post.
 7. Publish a LinkedIn image post using the first carousel slide.
 8. Publish an X image post using the first carousel slide.
-9. Upload a publish result JSON as a workflow artifact.
+9. Publish a Reddit self post with the carousel image URLs.
+10. Upload a publish result JSON as a workflow artifact.
 
 ## Dry Run
 

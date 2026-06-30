@@ -38,6 +38,13 @@ jobs:
       X_API_KEY_SECRET: ${{ secrets.X_API_KEY_SECRET }}
       X_OAUTH1_ACCESS_TOKEN: ${{ secrets.X_OAUTH1_ACCESS_TOKEN }}
       X_OAUTH1_ACCESS_TOKEN_SECRET: ${{ secrets.X_OAUTH1_ACCESS_TOKEN_SECRET }}
+      REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+      REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+      REDDIT_USERNAME: ${{ secrets.REDDIT_USERNAME }}
+      REDDIT_PASSWORD: ${{ secrets.REDDIT_PASSWORD }}
+      REDDIT_SUBREDDIT: ${{ secrets.REDDIT_SUBREDDIT }}
+      REDDIT_FLAIR_ID: ${{ secrets.REDDIT_FLAIR_ID }}
+      REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
       INSTAGRAM_COOLDOWN_UNTIL: ${{ vars.INSTAGRAM_COOLDOWN_UNTIL }}
       TZ: Asia/Seoul
 
@@ -216,6 +223,19 @@ jobs:
             --channels linkedin \
             --out "${CONTENT_DIR}/linkedin-publish-results.json"
 
+      - name: Publish Reddit
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --public-base-url "${{ steps.deployment.outputs.page_url }}${PUBLIC_PATH}" \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --reddit-title "${CONTENT_DIR}/reddit-title.txt" \
+            --reddit-post "${CONTENT_DIR}/reddit-post.txt" \
+            --channels reddit \
+            --out "${CONTENT_DIR}/reddit-publish-results.json"
+
       - name: Validate publish inputs only
         if: ${{ github.event.inputs.dry_run == 'true' }}
         run: |
@@ -225,6 +245,8 @@ jobs:
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
             --linkedin-caption "${CONTENT_DIR}/linkedin-post.txt" \
+            --reddit-title "${CONTENT_DIR}/reddit-title.txt" \
+            --reddit-post "${CONTENT_DIR}/reddit-post.txt" \
             --out "${CONTENT_DIR}/github-actions-publish-results.json" \
             --dry-run
 
