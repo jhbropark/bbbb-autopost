@@ -7,12 +7,11 @@ import argparse
 from dataclasses import dataclass
 from datetime import date
 import json
-import math
 import os
 from pathlib import Path
 import textwrap
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +27,18 @@ WIDTH = 1080
 HEIGHT = 1080
 SAFE_X = 112
 SAFE_RIGHT = 968
+PHOTO_ROOT = ROOT / "assets" / "photo-backgrounds"
+
+PHOTO_BACKGROUNDS = {
+    "kbeauty-ma-system-risk": (
+        PHOTO_ROOT / "kbeauty-ma" / "01-glass-building.jpg",
+        PHOTO_ROOT / "kbeauty-ma" / "02-korean-cosmetics.jpg",
+    ),
+    "derma-cosmetic-expansion": (
+        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+    ),
+}
 
 
 @dataclass(frozen=True)
@@ -198,53 +209,49 @@ def fit_text(draw: ImageDraw.ImageDraw, value: str, max_width: int, start_size: 
     return min_size
 
 
-def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
-    photo = Image.new("RGBA", image.size, (30, 40, 48, 255))
+def fallback_background() -> Image.Image:
+    photo = Image.new("RGBA", (WIDTH, HEIGHT), (30, 40, 48, 255))
     draw = ImageDraw.Draw(photo)
-
     for y in range(HEIGHT):
         ratio = y / (HEIGHT - 1)
         r = int(164 * (1 - ratio) + 18 * ratio)
         g = int(187 * (1 - ratio) + 24 * ratio)
         b = int(190 * (1 - ratio) + 32 * ratio)
         draw.line((0, y, WIDTH, y), fill=(r, g, b, 255))
+    return photo
 
-    if page == 1:
-        for x in range(-280, WIDTH + 180, 150):
-            draw.polygon(
-                [(x, -80), (x + 116, -80), (x + 520, HEIGHT + 120), (x + 392, HEIGHT + 120)],
-                fill=(184, 217, 227, 92),
-                outline=(245, 250, 252, 88),
-            )
-        for y in range(120, 650, 92):
-            draw.line((0, y, WIDTH, y + 180), fill=(255, 255, 255, 70), width=5)
-    elif page in {2, 3}:
-        draw.ellipse((-170, -100, 610, 700), fill=(224, 197, 181, 150))
-        draw.ellipse((520, 150, 1240, 940), fill=(177, 213, 224, 110))
-        for x in (215, 520, 805):
-            draw.rounded_rectangle((x, 230, x + 115, 820), radius=52, fill=(232, 238, 238, 128))
-            draw.rounded_rectangle((x + 28, 320, x + 86, 780), radius=26, fill=(22, 36, 48, 128))
-    else:
-        draw.ellipse((580, 60, 1230, 700), fill=(237, 244, 242, 118))
-        for idx in range(11):
-            x = 90 + idx * 90
-            y = 170 + int(math.sin(idx + page) * 48)
-            draw.line((x, y, x + 135, y + 82), fill=(255, 255, 255, 72), width=4)
-            draw.ellipse((x - 11, y - 11, x + 11, y + 11), fill=(14, 165, 233, 145))
+
+def load_topic_photo(topic: Topic, page: int) -> Image.Image:
+    candidates = [path for path in PHOTO_BACKGROUNDS.get(topic.slug, ()) if path.is_file()]
+    if not candidates:
+        return fallback_background()
+
+    source = candidates[(page - 1) % len(candidates)]
+    photo = Image.open(source)
+    photo = ImageOps.exif_transpose(photo).convert("RGB")
+    photo = ImageOps.fit(photo, (WIDTH, HEIGHT), method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+    photo = ImageEnhance.Color(photo).enhance(0.72)
+    photo = ImageEnhance.Contrast(photo).enhance(1.08)
+    return photo.convert("RGBA")
+
+
+def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
+    photo = load_topic_photo(topic, page)
+    photo = photo.filter(ImageFilter.GaussianBlur(1.2))
 
     noise = Image.effect_noise((WIDTH, HEIGHT), 20).convert("L")
     noise = ImageOps.colorize(noise, (0, 0, 0), (255, 255, 255)).convert("RGBA")
-    noise.putalpha(30)
-    photo = Image.alpha_composite(photo.filter(ImageFilter.GaussianBlur(1.1)), noise)
+    noise.putalpha(18)
+    photo = Image.alpha_composite(photo, noise)
 
     shade = Image.new("RGBA", image.size, (0, 0, 0, 0))
     shade_draw = ImageDraw.Draw(shade)
     for y in range(HEIGHT):
-        alpha = int(80 + 155 * (y / HEIGHT) ** 0.9)
-        shade_draw.line((0, y, WIDTH, y), fill=(6, 10, 18, alpha))
+        alpha = int(70 + 145 * (y / HEIGHT) ** 1.05)
+        shade_draw.line((0, y, WIDTH, y), fill=(30, 41, 59, alpha))
     for x in range(WIDTH):
-        alpha = int(105 * (1 - min(1, x / 720)))
-        shade_draw.line((x, 0, x, HEIGHT), fill=(6, 10, 18, alpha))
+        alpha = int(165 * (1 - min(1, x / 760)))
+        shade_draw.line((x, 0, x, HEIGHT), fill=(10, 16, 27, alpha))
 
     image.alpha_composite(photo)
     image.alpha_composite(shade)
@@ -291,8 +298,8 @@ def slide_evidence(topic: Topic) -> Image.Image:
     title(draw, 202, "기사에서 뽑은\n시장 신호", 52)
     y = 425
     for name, fact in topic.evidence:
-        draw.rectangle((SAFE_X, y, SAFE_X + 222, y + 72), fill=HIGHLIGHT)
-        draw.rectangle((SAFE_X + 244, y, SAFE_RIGHT, y + 72), fill=(255, 255, 255, 235))
+        draw.rectangle((SAFE_X, y, SAFE_X + 222, y + 72), fill=(14, 165, 233, 222))
+        draw.rectangle((SAFE_X + 244, y, SAFE_RIGHT, y + 72), fill=(255, 255, 255, 214))
         draw_text(draw, (SAFE_X + 111, y + 18), name, 25, WHITE, True, anchor="ma")
         draw_text(draw, (SAFE_X + 270, y + 18), fact, 24, "#111111", False)
         y += 104
@@ -324,7 +331,7 @@ def slide_production(topic: Topic) -> Image.Image:
     title(draw, 190, "게시물은\n이렇게 바꿔야 합니다", 54)
     y = 430
     for idx, item in enumerate(topic.production, start=1):
-        draw.rounded_rectangle((SAFE_X, y, SAFE_RIGHT, y + 88), radius=12, fill=(255, 255, 255, 232))
+        draw.rounded_rectangle((SAFE_X, y, SAFE_RIGHT, y + 88), radius=12, fill=(255, 255, 255, 210))
         draw_text(draw, (SAFE_X + 28, y + 23), f"{idx:02d}", 26, AQUA, True)
         draw_text(draw, (SAFE_X + 112, y + 24), item, 27, "#111111", True)
         y += 116
