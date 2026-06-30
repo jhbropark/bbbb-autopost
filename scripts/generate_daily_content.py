@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 import textwrap
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -205,53 +205,83 @@ def rounded_rectangle(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int],
 
 
 def add_gradient_background(image: Image.Image, topic: Topic, page: int) -> None:
-    pixels = image.load()
-    top = tuple(int(BEIGE[i : i + 2], 16) for i in (1, 3, 5))
-    bottom = (232, 221, 211)
-    for y in range(HEIGHT):
-        t = y / (HEIGHT - 1)
-        for x in range(WIDTH):
-            glow = 0.06 * math.sin((x + page * 57) / 90) + 0.04 * math.cos((y + page * 43) / 130)
-            ratio = max(0, min(1, t + glow))
-            pixels[x, y] = tuple(int(top[i] * (1 - ratio) + bottom[i] * ratio) for i in range(3))
+    photo = Image.new("RGBA", image.size, (232, 222, 213, 255))
+    draw = ImageDraw.Draw(photo)
 
-    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-    accent_x = 650 + (page % 3) * 38
-    draw.ellipse((accent_x, 110, accent_x + 520, 630), fill=(14, 165, 233, 28))
-    draw.ellipse((760, 480, 1180, 1060), fill=(201, 165, 143, 52))
-    draw.ellipse((-180, 650, 330, 1170), fill=(255, 255, 255, 80))
-    draw.rounded_rectangle((740, 146, 1000, 470), radius=70, fill=(255, 255, 255, 82))
-    draw.rounded_rectangle((812, 208, 910, 560), radius=48, fill=(30, 41, 59, 190))
-    draw.rounded_rectangle((835, 162, 887, 236), radius=22, fill=(14, 165, 233, 190))
-    draw.ellipse((675, 352, 745, 422), outline=(255, 255, 255, 160), width=5)
-    draw.ellipse((948, 582, 1015, 649), outline=(14, 165, 233, 150), width=5)
-    for idx in range(9):
-        x = 690 + idx * 38
-        y = 720 + int(math.sin(idx + page) * 36)
-        draw.line((x, y, x + 46, y + 28), fill=(30, 41, 59, 70), width=3)
-        draw.ellipse((x - 5, y - 5, x + 5, y + 5), fill=(14, 165, 233, 150))
-    image.alpha_composite(overlay)
+    for y in range(HEIGHT):
+        ratio = y / (HEIGHT - 1)
+        r = int(198 * (1 - ratio) + 34 * ratio)
+        g = int(218 * (1 - ratio) + 46 * ratio)
+        b = int(226 * (1 - ratio) + 56 * ratio)
+        draw.line((0, y, WIDTH, y), fill=(r, g, b, 255))
+
+    if page % 3 == 1:
+        # Glass facade / beauty corporate news style.
+        for x in range(-280, WIDTH + 180, 155):
+            draw.polygon(
+                [(x, -80), (x + 120, -80), (x + 520, HEIGHT + 120), (x + 390, HEIGHT + 120)],
+                fill=(180, 216, 230, 88),
+                outline=(242, 248, 250, 92),
+            )
+        for y in range(90, 620, 92):
+            draw.line((0, y, WIDTH, y + 180), fill=(255, 255, 255, 70), width=5)
+        draw.rectangle((0, 0, WIDTH, HEIGHT), outline=(255, 255, 255, 16), width=24)
+    elif page % 3 == 2:
+        # Serum bottle / skincare texture close-up.
+        draw.ellipse((-160, -70, 560, 650), fill=(236, 211, 196, 170))
+        draw.ellipse((530, 120, 1240, 890), fill=(178, 215, 226, 120))
+        draw.rounded_rectangle((690, 165, 895, 770), radius=88, fill=(240, 244, 245, 190))
+        draw.rounded_rectangle((740, 245, 845, 720), radius=45, fill=(31, 47, 64, 180))
+        draw.rounded_rectangle((756, 138, 830, 260), radius=31, fill=(14, 165, 233, 210))
+        draw.line((170, 230, 1040, 760), fill=(255, 255, 255, 95), width=7)
+    else:
+        # Lab surface / ingredient macro style.
+        draw.ellipse((610, 70, 1230, 690), fill=(235, 242, 240, 125))
+        draw.ellipse((-240, 500, 480, 1190), fill=(227, 206, 190, 150))
+        for idx in range(10):
+            x = 120 + idx * 88
+            y = 180 + int(math.sin(idx + page) * 46)
+            draw.line((x, y, x + 120, y + 80), fill=(255, 255, 255, 72), width=4)
+            draw.ellipse((x - 10, y - 10, x + 10, y + 10), fill=(14, 165, 233, 120))
+        draw.rounded_rectangle((720, 185, 1040, 420), radius=58, fill=(255, 255, 255, 105))
+
+    noise = Image.effect_noise((WIDTH, HEIGHT), 18).convert("L")
+    noise = ImageOps.colorize(noise, (0, 0, 0), (255, 255, 255)).convert("RGBA")
+    noise.putalpha(32)
+    photo = Image.alpha_composite(photo.filter(ImageFilter.GaussianBlur(1.2)), noise)
+
+    shade = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    shade_draw = ImageDraw.Draw(shade)
+    for y in range(HEIGHT):
+        if y < 230:
+            alpha = int(72 * (1 - y / 230))
+        else:
+            alpha = int(212 * ((y - 230) / (HEIGHT - 230)) ** 0.82)
+        shade_draw.line((0, y, WIDTH, y), fill=(7, 14, 24, min(230, max(0, alpha))))
+    for x in range(WIDTH):
+        alpha = int(120 * (1 - min(1, x / 650)))
+        shade_draw.line((x, 0, x, HEIGHT), fill=(7, 14, 24, alpha))
+
+    image.alpha_composite(photo)
+    image.alpha_composite(shade)
 
 
 def header(draw: ImageDraw.ImageDraw, topic: Topic, page: int) -> None:
-    rounded_rectangle(draw, (88, 70, 992, 132), 31, NAVY)
-    text(draw, (122, 91), f"bbbb / {topic.pillar.upper()}", 18, WHITE, True)
-    text(draw, (918, 91), f"{page:02d}/05", 18, AQUA, True)
+    text(draw, (SAFE_X, 72), f"bbbb / {topic.pillar.upper()}", 19, WHITE, True)
+    text(draw, (CONTENT_RIGHT, 72), f"{page:02d}/05", 19, AQUA, True, anchor="ra")
 
 
 def badge(draw: ImageDraw.ImageDraw, xy: tuple[int, int], label: str) -> None:
     x, y = xy
     box = draw.textbbox((0, 0), label, font=font(16, True))
     width = box[2] - box[0] + 42
-    rounded_rectangle(draw, (x, y, x + width, y + 42), 21, NAVY)
+    rounded_rectangle(draw, (x, y, x + width, y + 42), 21, (30, 41, 59, 166))
     text(draw, (x + 21, y + 11), label, 16, WHITE, True)
 
 
 def footer(draw: ImageDraw.ImageDraw) -> None:
-    text(draw, (SAFE_X, 1008), "BBBB BEAUTY INTELLIGENCE", 15, MUTED, True)
-    rounded_rectangle(draw, (780, 1000, 952, 1029), 14, NAVY)
-    text(draw, (806, 1007), "SAVE / SHARE", 13, WHITE, True)
+    text(draw, (SAFE_X, 1008), "BBBB BEAUTY INTELLIGENCE", 15, (255, 255, 255, 210), True)
+    text(draw, (CONTENT_RIGHT, 1008), "SAVE / SHARE", 13, (255, 255, 255, 210), True, anchor="ra")
 
 
 def question_support(topic: Topic, question: str, action: str) -> str:
@@ -264,19 +294,16 @@ def slide(topic: Topic, page: int, eyebrow: str, title: str, body: str) -> Image
     add_gradient_background(image, topic, page)
     draw = ImageDraw.Draw(image)
     header(draw, topic, page)
-    badge(draw, (SAFE_X, 184), eyebrow)
-
-    panel_top = 256
-    panel_bottom = 824
-    rounded_rectangle(draw, (92, panel_top, 988, panel_bottom), 42, (255, 255, 255, 210), outline=(255, 255, 255, 230), width=2)
-    draw.rectangle((92, panel_top, 116, panel_bottom), fill=AQUA)
+    badge(draw, (SAFE_X, 170), eyebrow)
 
     max_title_width = CONTENT_RIGHT - SAFE_X
-    title_size = fit_text(draw, title, max_title_width, 54, 39, True)
-    text(draw, (SAFE_X, 322), title, title_size, NAVY, True, 9)
+    title_size = fit_text(draw, title, max_title_width, 62, 42, True)
+    text(draw, (SAFE_X + 3, 317 + 3), title, title_size, (0, 0, 0, 115), True, 9)
+    text(draw, (SAFE_X, 317), title, title_size, WHITE, True, 9)
 
     wrapped_body = wrapped(body, 25)
-    text(draw, (SAFE_X, 686), wrapped_body, 27, MUTED, False, 8)
+    text(draw, (SAFE_X + 2, 724 + 2), wrapped_body, 28, (0, 0, 0, 110), False, 8)
+    text(draw, (SAFE_X, 724), wrapped_body, 28, (255, 255, 255, 232), False, 8)
     footer(draw)
     return image.convert("RGB")
 
