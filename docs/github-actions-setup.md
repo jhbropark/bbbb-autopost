@@ -75,6 +75,10 @@ The Facebook Page access token must belong to:
 
 - Facebook Page: `Beyond Beauty Building Brands`
 
+`META_GRAPH_VERSION` is used by both publishing and Instagram duplicate-preflight
+checks. Keep it on the current supported Graph API version, and do not hard-code
+Graph API versions in helper scripts.
+
 Minimum LinkedIn token permissions:
 
 ```text
@@ -154,10 +158,6 @@ This validates generated image URLs and captions without publishing to Meta.
 
 ## Current Limitation
 
-The current content generator is the MOA carousel generator:
-
-```text
-create_2026_06_16_moa_post.py
-```
-
-For a fully rotating daily calendar, add a date-based content router that selects the topic and generator for each day.
+The current date-based generator includes only a small topic set. To avoid
+Instagram duplicate-caption skips while the topic set is being expanded, it adds
+a date-specific observation line to each Instagram caption.

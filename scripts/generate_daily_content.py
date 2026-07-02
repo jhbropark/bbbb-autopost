@@ -164,6 +164,14 @@ TOPICS = (
 )
 
 
+INSTAGRAM_DAILY_ANGLES = (
+    "Today lens: market signal -> content decision.",
+    "Today lens: evidence -> customer understanding.",
+    "Today lens: channel risk -> message structure.",
+    "Today lens: execution system -> repeatable publishing.",
+)
+
+
 def font_path(bold: bool) -> Path:
     candidates = [
         os.getenv("FONT_BOLD" if bold else "FONT_REGULAR", ""),
@@ -355,6 +363,11 @@ def slide_checklist(topic: Topic) -> Image.Image:
     return image.convert("RGB")
 
 
+def instagram_caption_for(topic: Topic, target_date: date) -> str:
+    cycle = ((target_date - ANCHOR_DATE).days // max(1, len(TOPICS))) % len(INSTAGRAM_DAILY_ANGLES)
+    return f"{topic.instagram}\n\n{INSTAGRAM_DAILY_ANGLES[cycle]} #{target_date.isoformat()}"
+
+
 def create_package(target_date: date, out_root: Path) -> Path:
     index = (target_date - ANCHOR_DATE).days % len(TOPICS)
     topic = TOPICS[index]
@@ -373,7 +386,7 @@ def create_package(target_date: date, out_root: Path) -> Path:
         image.save(carousel / f"{page:02d}.png", quality=95)
 
     source_lines = "\n".join(f"- {source.title} ({source.date}) {source.url}" for source in topic.sources)
-    (out / "instagram-caption.txt").write_text(topic.instagram, encoding="utf-8")
+    (out / "instagram-caption.txt").write_text(instagram_caption_for(topic, target_date), encoding="utf-8")
     (out / "facebook-caption.txt").write_text(f"{topic.facebook}\n\n참고: 한국경제 기사 기반 시장 신호 분석", encoding="utf-8")
     (out / "linkedin-post.txt").write_text(f"{topic.linkedin}\n\n참고 기사:\n{source_lines}", encoding="utf-8")
     (out / "reddit-title.txt").write_text(topic.x_post, encoding="utf-8")

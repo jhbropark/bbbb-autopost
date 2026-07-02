@@ -11,6 +11,11 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 
+def graph_base() -> str:
+    version = os.getenv("META_GRAPH_VERSION", "").strip() or "v25.0"
+    return f"https://graph.facebook.com/{version}"
+
+
 def normalize(value: str) -> str:
     return "\n".join(line.strip() for line in value.strip().splitlines() if line.strip())
 
@@ -47,7 +52,7 @@ def main() -> int:
             "access_token": token,
         }
     )
-    request = Request(f"https://graph.facebook.com/v25.0/{account_id}/media?{query}")
+    request = Request(f"{graph_base()}/{account_id}/media?{query}")
     try:
         with urlopen(request, timeout=30) as response:
             payload = json.loads(response.read().decode("utf-8"))
