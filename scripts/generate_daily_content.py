@@ -46,6 +46,22 @@ PHOTO_BACKGROUNDS = {
         PHOTO_ROOT / "kbeauty-ma" / "01-glass-building.jpg",
         PHOTO_ROOT / "kbeauty-ma" / "02-korean-cosmetics.jpg",
     ),
+    "mechanism-in-motion": (
+        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+    ),
+    "patient-understanding-system": (
+        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+    ),
+    "pharma-visual-proof": (
+        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+        PHOTO_ROOT / "kbeauty-ma" / "01-glass-building.jpg",
+    ),
+    "medical-visual-production-standard": (
+        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+    ),
 }
 
 PAGE_VARIANTS = (
@@ -479,7 +495,7 @@ def fallback_background() -> Image.Image:
 def load_topic_photo(topic: Topic, page: int) -> Image.Image:
     candidates = [path for path in PHOTO_BACKGROUNDS.get(topic.slug, ()) if path.is_file()]
     if not candidates:
-        return fallback_background()
+        raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
 
     variant = PAGE_VARIANTS[(page - 1) % len(PAGE_VARIANTS)]
     source = candidates[int(variant["photo"]) % len(candidates)]
@@ -704,9 +720,21 @@ def linkedin_post_for(topic: Topic, source_lines: str) -> str:
     )
 
 
+def validate_topic_assets(topic: Topic) -> None:
+    configured = PHOTO_BACKGROUNDS.get(topic.slug)
+    if not configured:
+        raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
+    missing = [str(path) for path in configured if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            f"Missing photo background assets for topic slug {topic.slug}: " + ", ".join(missing)
+        )
+
+
 def create_package(target_date: date, out_root: Path) -> Path:
     index = (target_date - ANCHOR_DATE).days % len(TOPICS)
     topic = TOPICS[index]
+    validate_topic_assets(topic)
     out = out_root / f"{target_date.isoformat()}-{topic.slug}"
     carousel = out / "carousel"
     carousel.mkdir(parents=True, exist_ok=True)
