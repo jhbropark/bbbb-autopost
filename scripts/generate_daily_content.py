@@ -28,6 +28,12 @@ HEIGHT = 1080
 SAFE_X = 104
 SAFE_RIGHT = 976
 PHOTO_ROOT = ROOT / "assets" / "photo-backgrounds"
+DERMA_BIO_BACKGROUNDS = (
+    PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+    PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+    PHOTO_ROOT / "kbeauty-ma" / "01-glass-building.jpg",
+    PHOTO_ROOT / "kbeauty-ma" / "02-korean-cosmetics.jpg",
+)
 
 PHOTO_BACKGROUNDS = {
     "kbeauty-ma-system-risk": (
@@ -47,20 +53,22 @@ PHOTO_BACKGROUNDS = {
         PHOTO_ROOT / "kbeauty-ma" / "02-korean-cosmetics.jpg",
     ),
     "mechanism-in-motion": (
-        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
-        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+        *DERMA_BIO_BACKGROUNDS,
     ),
     "patient-understanding-system": (
         PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
         PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
+        PHOTO_ROOT / "kbeauty-ma" / "02-korean-cosmetics.jpg",
+        PHOTO_ROOT / "kbeauty-ma" / "01-glass-building.jpg",
     ),
     "pharma-visual-proof": (
         PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
         PHOTO_ROOT / "kbeauty-ma" / "01-glass-building.jpg",
+        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+        PHOTO_ROOT / "kbeauty-ma" / "02-korean-cosmetics.jpg",
     ),
     "medical-visual-production-standard": (
-        PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
-        PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
+        *DERMA_BIO_BACKGROUNDS,
     ),
 }
 
@@ -498,7 +506,7 @@ def load_topic_photo(topic: Topic, page: int) -> Image.Image:
         raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
 
     variant = PAGE_VARIANTS[(page - 1) % len(PAGE_VARIANTS)]
-    source = candidates[int(variant["photo"]) % len(candidates)]
+    source = candidates[(page - 1) % len(candidates)]
     photo = Image.open(source)
     photo = ImageOps.exif_transpose(photo).convert("RGB")
     photo = ImageOps.fit(
@@ -512,6 +520,20 @@ def load_topic_photo(topic: Topic, page: int) -> Image.Image:
         photo = ImageOps.mirror(photo)
     photo = ImageEnhance.Color(photo).enhance(0.68)
     photo = ImageEnhance.Contrast(photo).enhance(1.16)
+    if page > len(candidates) and len(candidates) > 1:
+        secondary = Image.open(candidates[page % len(candidates)])
+        secondary = ImageOps.exif_transpose(secondary).convert("RGB")
+        secondary = ImageOps.fit(
+            secondary,
+            (round(WIDTH / float(variant["zoom"])), round(HEIGHT / float(variant["zoom"]))),
+            method=Image.Resampling.LANCZOS,
+            centering=(1 - float(variant["center"][0]), float(variant["center"][1])),
+        )
+        secondary = secondary.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
+        secondary = ImageOps.mirror(secondary)
+        secondary = ImageEnhance.Color(secondary).enhance(0.58)
+        secondary = ImageEnhance.Contrast(secondary).enhance(1.08)
+        photo = Image.blend(photo, secondary, 0.42)
     return photo.convert("RGBA").filter(ImageFilter.GaussianBlur(float(variant["blur"])))
 
 
