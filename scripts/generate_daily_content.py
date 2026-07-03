@@ -28,6 +28,7 @@ HEIGHT = 1080
 SAFE_X = 104
 SAFE_RIGHT = 976
 PHOTO_ROOT = ROOT / "assets" / "photo-backgrounds"
+FONT_ROOT = ROOT / "assets" / "fonts"
 DERMA_BIO_BACKGROUNDS = (
     PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
     PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
@@ -440,6 +441,7 @@ TOPICS = (
 def font_path(bold: bool) -> Path:
     candidates = [
         os.getenv("FONT_BOLD" if bold else "FONT_REGULAR", ""),
+        FONT_ROOT / ("Paperlogy-7Bold.ttf" if bold else "Paperlogy-4Regular.ttf"),
         r"C:\Windows\Fonts\malgunbd.ttf" if bold else r"C:\Windows\Fonts\malgun.ttf",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc" if bold else "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ]
@@ -557,17 +559,17 @@ def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
 
 
 def header(draw: ImageDraw.ImageDraw, topic: Topic, page: int, section: str) -> None:
-    draw.rounded_rectangle((SAFE_X, 58, SAFE_RIGHT, 112), radius=27, fill=(30, 41, 59, 230))
-    draw_text(draw, (SAFE_X + 28, 74), f"bbbb / {topic.pillar.upper()}", 17, WHITE, True)
-    draw_text(draw, (SAFE_RIGHT - 28, 74), f"{page:02d}/05", 17, AQUA, True, anchor="ra")
-    draw.rounded_rectangle((SAFE_X, 150, SAFE_X + 360, 196), radius=23, fill=(0, 0, 0, 205))
-    draw_text(draw, (SAFE_X + 24, 162), section, 15, WHITE, True)
+    draw_text(draw, (SAFE_X + 3, 75), f"bbbb / {topic.pillar.upper()}", 17, (0, 0, 0, 150), True)
+    draw_text(draw, (SAFE_X, 72), f"bbbb / {topic.pillar.upper()}", 17, WHITE, True)
+    draw_text(draw, (SAFE_RIGHT - 25, 75), f"{page:02d}/05", 17, (0, 0, 0, 150), True, anchor="ra")
+    draw_text(draw, (SAFE_RIGHT - 28, 72), f"{page:02d}/05", 17, AQUA, True, anchor="ra")
+    draw_text(draw, (SAFE_X + 3, 157), section, 15, (0, 0, 0, 150), True)
+    draw_text(draw, (SAFE_X, 154), section, 15, WHITE, True)
 
 
 def footer(draw: ImageDraw.ImageDraw) -> None:
     draw_text(draw, (SAFE_X, 1012), "BBBB BEAUTY INTELLIGENCE", 14, (255, 255, 255, 220), True)
-    draw.rounded_rectangle((SAFE_RIGHT - 178, 996, SAFE_RIGHT, 1028), radius=16, fill=(30, 41, 59, 220))
-    draw_text(draw, (SAFE_RIGHT - 89, 1005), "SAVE / SHARE", 13, WHITE, True, anchor="ma")
+    draw_text(draw, (SAFE_RIGHT, 1012), "SAVE / SHARE", 13, (255, 255, 255, 220), True, anchor="ra")
 
 
 def title(draw: ImageDraw.ImageDraw, y: int, value: str, size: int = 54, color: str = WHITE) -> None:
@@ -577,7 +579,7 @@ def title(draw: ImageDraw.ImageDraw, y: int, value: str, size: int = 54, color: 
 
 
 def translucent_panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], alpha: int = 205) -> None:
-    draw.rounded_rectangle(box, radius=24, fill=(248, 246, 242, alpha))
+    return None
 
 
 def slide_hook(topic: Topic) -> Image.Image:
@@ -599,10 +601,10 @@ def slide_evidence(topic: Topic) -> Image.Image:
     title(draw, 206, "기사에서 읽어야 할\n세 가지 시장 신호", 51)
     y = 448
     for name, fact in topic.evidence:
-        draw.rounded_rectangle((SAFE_X, y, SAFE_X + 188, y + 82), radius=8, fill=(14, 165, 233, 230))
-        translucent_panel(draw, (SAFE_X + 210, y, SAFE_RIGHT, y + 82), 222)
-        draw_text(draw, (SAFE_X + 94, y + 24), name, 23, WHITE, True, anchor="ma")
-        draw_text(draw, (SAFE_X + 238, y + 18), wrap(fact, 30), 21, INK, False, 5)
+        draw_text(draw, (SAFE_X + 3, y + 3), name, 25, (0, 0, 0, 150), True)
+        draw_text(draw, (SAFE_X, y), name, 25, AQUA, True)
+        draw_text(draw, (SAFE_X + 3, y + 41), wrap(fact, 34), 24, (0, 0, 0, 150), False, 7)
+        draw_text(draw, (SAFE_X, y + 38), wrap(fact, 34), 24, WHITE, False, 7)
         y += 110
     footer(draw)
     return image.convert("RGB")
@@ -616,9 +618,10 @@ def slide_dilemma(topic: Topic) -> Image.Image:
     title(draw, 190, "브랜드가 겪는\n핵심 딜레마", 55)
     y = 420
     for idx, (label, detail) in enumerate(topic.dilemma, start=1):
-        draw.rectangle((SAFE_X, y, SAFE_RIGHT, y + 58), fill=(14, 165, 233, 225))
-        draw_text(draw, ((SAFE_X + SAFE_RIGHT) // 2, y + 13), f"{idx}. {label}", 25, WHITE, True, anchor="ma")
-        draw_text(draw, (SAFE_X, y + 88), wrap(detail, 29), 28, (255, 255, 255, 238), False, 10)
+        draw_text(draw, (SAFE_X + 3, y + 3), f"{idx}. {label}", 31, (0, 0, 0, 150), True)
+        draw_text(draw, (SAFE_X, y), f"{idx}. {label}", 31, AQUA, True)
+        draw_text(draw, (SAFE_X + 3, y + 66), wrap(detail, 29), 28, (0, 0, 0, 150), False, 10)
+        draw_text(draw, (SAFE_X, y + 63), wrap(detail, 29), 28, (255, 255, 255, 238), False, 10)
         if idx == 1:
             draw_text(draw, ((SAFE_X + SAFE_RIGHT) // 2, y + 190), "↓", 42, AQUA, True, anchor="ma")
         y += 258
@@ -634,9 +637,10 @@ def slide_production(topic: Topic) -> Image.Image:
     title(draw, 185, "게시물은 이렇게\n전문성을 갖춥니다", 52)
     y = 420
     for idx, item in enumerate(topic.production, start=1):
-        translucent_panel(draw, (SAFE_X, y, SAFE_RIGHT, y + 92), 222)
-        draw_text(draw, (SAFE_X + 30, y + 26), f"{idx:02d}", 24, AQUA, True)
-        draw_text(draw, (SAFE_X + 112, y + 24), wrap(item, 28), 25, INK, True, 5)
+        draw_text(draw, (SAFE_X + 3, y + 3), f"{idx:02d}", 25, (0, 0, 0, 150), True)
+        draw_text(draw, (SAFE_X, y), f"{idx:02d}", 25, AQUA, True)
+        draw_text(draw, (SAFE_X + 84 + 3, y + 3), wrap(item, 29), 27, (0, 0, 0, 150), True, 6)
+        draw_text(draw, (SAFE_X + 84, y), wrap(item, 29), 27, WHITE, True, 6)
         y += 116
     footer(draw)
     return image.convert("RGB")
@@ -650,9 +654,10 @@ def slide_checklist(topic: Topic) -> Image.Image:
     title(draw, 180, f"{topic.pillar}\n실무 체크리스트", 50)
     y = 420
     for idx, item in enumerate(topic.checklist, start=1):
-        draw.rounded_rectangle((SAFE_X, y, SAFE_X + 64, y + 58), radius=8, fill=(14, 165, 233, 230))
-        draw_text(draw, (SAFE_X + 32, y + 13), str(idx), 24, WHITE, True, anchor="ma")
-        draw_text(draw, (SAFE_X + 92, y + 11), wrap(item, 27), 27, WHITE, True, 5)
+        draw_text(draw, (SAFE_X + 3, y + 3), f"{idx:02d}", 25, (0, 0, 0, 150), True)
+        draw_text(draw, (SAFE_X, y), f"{idx:02d}", 25, AQUA, True)
+        draw_text(draw, (SAFE_X + 84 + 3, y + 3), wrap(item, 28), 28, (0, 0, 0, 150), True, 5)
+        draw_text(draw, (SAFE_X + 84, y), wrap(item, 28), 28, WHITE, True, 5)
         y += 88
     footer(draw)
     return image.convert("RGB")
