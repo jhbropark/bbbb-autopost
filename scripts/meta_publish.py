@@ -203,6 +203,48 @@ def publish_instagram_carousel(image_urls: list[str], caption: str) -> dict[str,
     return request_json("GET", f"{graph_base()}/{result['id']}?{query}")
 
 
+def wait_instagram_container(creation_id: str, token: str, label: str) -> None:
+    for _ in range(60):
+        query = urlencode({"fields": "status_code,status", "access_token": token})
+        status = request_json("GET", f"{graph_base()}/{creation_id}?{query}")
+        if status.get("status_code") == "FINISHED":
+            return
+        if status.get("status_code") in {"ERROR", "EXPIRED"}:
+            raise PublishError(f"Instagram {label} container failed: {status}")
+        time.sleep(10)
+    raise PublishError(f"Instagram {label} container timed out.")
+
+
+def publish_instagram_reel(video_url: str, caption: str) -> dict[str, Any]:
+    account_id = require_env("INSTAGRAM_ACCOUNT_ID")
+    token = require_env("META_SYSTEM_USER_ACCESS_TOKEN")
+    container = request_json(
+        "POST",
+        f"{graph_base()}/{account_id}/media",
+        {
+            "media_type": "REELS",
+            "video_url": video_url,
+            "caption": caption,
+            "share_to_feed": "true",
+            "access_token": token,
+        },
+    )
+    creation_id = container["id"]
+    wait_instagram_container(creation_id, token, "reel")
+    result = request_json(
+        "POST",
+        f"{graph_base()}/{account_id}/media_publish",
+        {"creation_id": creation_id, "access_token": token},
+    )
+    query = urlencode(
+        {
+            "fields": "id,permalink,timestamp,media_type,media_product_type",
+            "access_token": token,
+        }
+    )
+    return request_json("GET", f"{graph_base()}/{result['id']}?{query}")
+
+
 def find_recent_instagram_post(caption: str, token: str, account_id: str) -> dict[str, Any] | None:
     expected = normalize_text(caption)
     query = urlencode(
@@ -616,6 +658,8 @@ def main() -> int:
     parser.add_argument("--carousel-dir", required=True)
     parser.add_argument("--public-base-url", required=True)
     parser.add_argument("--instagram-caption", required=True)
+    parser.add_argument("--instagram-reel-caption")
+    parser.add_argument("--instagram-reel-url")
     parser.add_argument("--facebook-caption", required=True)
     parser.add_argument("--linkedin-caption")
     parser.add_argument("--reddit-title")
@@ -643,7 +687,7 @@ def main() -> int:
     args = parser.parse_args()
 
     selected_channels = {item.strip() for item in args.channels.split(",") if item.strip()}
-    invalid_channels = selected_channels - {"instagram", "facebook", "linkedin", "x", "reddit"}
+    invalid_channels = selected_channels - {"instagram", "instagram_reel", "facebook", "linkedin", "x", "reddit"}
     if invalid_channels:
         raise PublishError(f"Unsupported channels: {', '.join(sorted(invalid_channels))}")
 
@@ -687,6 +731,13 @@ def main() -> int:
     if args.x_thread:
         x_thread_posts = read_x_thread(Path(args.x_thread))
         payload["x_thread_count"] = len(x_thread_posts)
+    instagram_reel_caption = None
+    if "instagram_reel" in selected_channels:
+        if not args.instagram_reel_url or not args.instagram_reel_caption:
+            raise PublishError("instagram_reel requires --instagram-reel-url and --instagram-reel-caption")
+        instagram_reel_caption = Path(args.instagram_reel_caption).read_text(encoding="utf-8").strip()
+        payload["instagram_reel_url"] = args.instagram_reel_url
+        payload["instagram_reel_caption_length"] = len(instagram_reel_caption)
     if not args.dry_run:
         if "instagram" in selected_channels:
             publish_channel(
@@ -694,6 +745,15 @@ def main() -> int:
                 "instagram",
                 lambda: publish_instagram_carousel(
                     image_urls, Path(args.instagram_caption).read_text(encoding="utf-8").strip()
+                ),
+            )
+        if "instagram_reel" in selected_channels:
+            publish_channel(
+                payload,
+                "instagram_reel",
+                lambda: publish_instagram_reel(
+                    args.instagram_reel_url,
+                    instagram_reel_caption or "",
                 ),
             )
         if "facebook" in selected_channels:

@@ -80,6 +80,14 @@ jobs:
             --carousel-dir "${CONTENT_DIR}/carousel" \
             --out "${CONTENT_DIR}/x-browser-handoff.html"
 
+      - name: Build Instagram Reels video
+        run: |
+          python scripts/build_instagram_reel.py \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --out "${CONTENT_DIR}/instagram-reel.mp4" \
+            --caption-out "${CONTENT_DIR}/instagram-reel-caption.txt"
+
       - name: Restore GitHub Pages asset history
         shell: bash
         run: |
@@ -97,6 +105,7 @@ jobs:
           mkdir -p "_site/${PUBLIC_PATH}"
           cp "${CONTENT_DIR}/carousel/"*.png "_site/${PUBLIC_PATH}/"
           cp "${CONTENT_DIR}/x-browser-handoff.html" "_site/${PUBLIC_PATH}/"
+          cp "${CONTENT_DIR}/instagram-reel.mp4" "_site/${PUBLIC_PATH}/"
           touch "_site/.nojekyll"
           echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
           echo "PUBLIC_PATH=${PUBLIC_PATH}" >> "$GITHUB_ENV"
@@ -188,6 +197,21 @@ jobs:
         env:
           INSTAGRAM_DUPLICATE_PERMALINK: ${{ steps.duplicate-check.outputs.duplicate_permalink }}
           INSTAGRAM_DUPLICATE_TIMESTAMP: ${{ steps.duplicate-check.outputs.duplicate_timestamp }}
+
+      - name: Publish Instagram Reel
+        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' }}
+        continue-on-error: true
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --public-base-url "${PUBLISH_BASE_URL}" \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --instagram-reel-caption "${CONTENT_DIR}/instagram-reel-caption.txt" \
+            --instagram-reel-url "${PUBLISH_BASE_URL}/instagram-reel.mp4" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --channels instagram_reel \
+            --out "${CONTENT_DIR}/instagram-reel-publish-results.json" \
+            --allow-failures
 
       - name: Publish Facebook
         if: ${{ github.event.inputs.dry_run != 'true' }}
