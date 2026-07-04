@@ -66,6 +66,10 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Sync free image backgrounds
+        continue-on-error: true
+        run: python scripts/sync_free_image_assets.py --per-topic 4 --search-limit 20
+
       - name: Generate date-specific content
         run: |
           CONTENT_DIR="$(python scripts/generate_daily_content.py --date "$(date +%F)")"

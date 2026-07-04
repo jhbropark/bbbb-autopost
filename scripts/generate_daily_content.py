@@ -28,6 +28,7 @@ HEIGHT = 1080
 SAFE_X = 104
 SAFE_RIGHT = 976
 PHOTO_ROOT = ROOT / "assets" / "photo-backgrounds"
+FREE_PHOTO_ROOT = ROOT / "assets" / "free-image-backgrounds"
 FONT_ROOT = ROOT / "assets" / "fonts"
 DERMA_BIO_BACKGROUNDS = (
     PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
@@ -503,7 +504,10 @@ def fallback_background() -> Image.Image:
 
 
 def load_topic_photo(topic: Topic, page: int) -> Image.Image:
-    candidates = [path for path in PHOTO_BACKGROUNDS.get(topic.slug, ()) if path.is_file()]
+    synced = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.jpg")) + sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.png"))
+    candidates = [path for path in synced if path.is_file()]
+    if not candidates:
+        candidates = [path for path in PHOTO_BACKGROUNDS.get(topic.slug, ()) if path.is_file()]
     if not candidates:
         raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
 
