@@ -244,6 +244,20 @@ jobs:
             --out "${CONTENT_DIR}/linkedin-publish-results.json" \
             --allow-failures
 
+      - name: Publish LinkedIn English
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        continue-on-error: true
+        run: |
+          python scripts/meta_publish.py \
+            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --public-base-url "${PUBLISH_BASE_URL}" \
+            --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
+            --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
+            --linkedin-caption "${CONTENT_DIR}/linkedin-post-en.txt" \
+            --channels linkedin \
+            --out "${CONTENT_DIR}/linkedin-english-publish-results.json" \
+            --allow-failures
+
       - name: Publish X
         if: ${{ github.event.inputs.dry_run != 'true' }}
         continue-on-error: true

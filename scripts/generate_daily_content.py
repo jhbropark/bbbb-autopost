@@ -586,6 +586,102 @@ def translucent_panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int],
     return None
 
 
+LINKEDIN_ENGLISH_BRIEFS = {
+    "kbeauty-ma-system-risk": {
+        "problem": "K-beauty M&A stories often focus on acquisition size, but the operational risk appears after the deal: channel control, product cadence, decision speed, and brand memory.",
+        "frame": "For medical skincare and beauty brands, content should explain what changes when a fast local brand enters a global operating system.",
+        "questions": (
+            "Which part of the brand system becomes slower after acquisition?",
+            "Which product or claim still needs local speed to stay credible?",
+            "Which scene can show the gap between headquarters logic and market behavior?",
+        ),
+    },
+    "derma-cosmetic-expansion": {
+        "problem": "Dermocosmetic brands are expanding across skincare, functional cosmetics, beauty devices, and bio-adjacent claims, but audiences do not trust expansion just because the category sounds scientific.",
+        "frame": "The content task is to show what has been validated, what is still a brand promise, and where the consumer should place attention.",
+        "questions": (
+            "Which ingredient, device, or claim is actually central?",
+            "What use case makes the benefit understandable?",
+            "What evidence boundary should the brand respect?",
+        ),
+    },
+    "clinical-proof-translation": {
+        "problem": "Clinical or scientific proof can lose value when it is presented as a dense list of terms instead of a decision pathway.",
+        "frame": "A stronger post translates evidence into sequence: what the product does, when it matters, and what the viewer can reasonably infer.",
+        "questions": (
+            "What is the minimum proof the audience must understand first?",
+            "Which claim needs a visual explanation rather than a slogan?",
+            "How should the channel separate education from promotion?",
+        ),
+    },
+    "post-acquisition-brand-system": {
+        "problem": "After acquisition, a beauty brand can keep its name but lose the operating rhythm that made the brand distinctive.",
+        "frame": "Content should make the invisible system visible: decision layers, portfolio logic, launch rhythm, and consumer trust signals.",
+        "questions": (
+            "Which brand behavior changed after acquisition?",
+            "What consumer signal shows whether trust is holding?",
+            "Which visual scene can explain the system shift without overclaiming?",
+        ),
+    },
+    "mechanism-in-motion": {
+        "problem": "Medical skincare content often says absorption, delivery, protection, or regeneration without showing how the mechanism works.",
+        "frame": "3D medical animation should turn an invisible mechanism into a sequence viewers can inspect, remember, and discuss.",
+        "questions": (
+            "Which mechanism is invisible in ordinary product photography?",
+            "Which step should be shown first for patient or consumer understanding?",
+            "Which claim must remain within a medically reviewable boundary?",
+        ),
+    },
+    "patient-understanding-system": {
+        "problem": "A patient or consumer rarely rejects content because it is not beautiful enough. They disengage when the explanation is not ordered.",
+        "frame": "The useful system is a clarity ladder: context, mechanism, evidence, practical relevance, and next question.",
+        "questions": (
+            "What does the viewer need to understand before the product benefit?",
+            "Which visual scene reduces confusion fastest?",
+            "Where should clinical, marketing, and sales language be separated?",
+        ),
+    },
+    "pharma-visual-proof": {
+        "problem": "Pharma and bio messages often contain evidence, but evidence alone does not explain how a mechanism works or why a choice matters.",
+        "frame": "A visual proof system should connect mechanism of action, treatment context, evidence limits, and channel-specific messaging.",
+        "questions": (
+            "Which mechanism needs to be visualized before the claim is persuasive?",
+            "Which evidence boundary should be made explicit?",
+            "How should the same science be translated for Instagram, Facebook, and LinkedIn?",
+        ),
+    },
+    "medical-visual-production-standard": {
+        "problem": "Medical visual content fails when it looks polished but cannot support review, education, or commercial reuse.",
+        "frame": "A production standard should connect scientific accuracy, visual hierarchy, review workflow, and the business use of each asset.",
+        "questions": (
+            "Which part of the content needs medical review first?",
+            "Which visual decision affects comprehension most?",
+            "How can one asset serve education, sales, and brand trust without becoming vague?",
+        ),
+    },
+}
+
+
+def linkedin_english_post_for(topic: Topic, source_lines: str) -> str:
+    brief = LINKEDIN_ENGLISH_BRIEFS[topic.slug]
+    questions = "\n".join(f"{index}. {item}" for index, item in enumerate(brief["questions"], start=1))
+    return (
+        f"{topic.pillar} / bbbb.beauty\n\n"
+        f"Problem:\n{brief['problem']}\n\n"
+        f"Operating frame:\n{brief['frame']}\n\n"
+        "Questions to solve before production:\n"
+        f"{questions}\n\n"
+        "BBBB production view:\n"
+        "A strong medical skincare post is not a decorated claim. It is a structured explanation system: mechanism, evidence, context, and channel role should move together.\n\n"
+        "Channel translation:\n"
+        "- Instagram: make the mechanism visually immediate.\n"
+        "- Facebook: explain why the claim matters.\n"
+        "- LinkedIn: show how the production logic can be reviewed and reused.\n\n"
+        "Reference links:\n"
+        f"{source_lines}"
+    )
+
+
 def slide_hook(topic: Topic) -> Image.Image:
     image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 255))
     add_photo_background(image, topic, 1)
@@ -784,6 +880,7 @@ def create_package(target_date: date, out_root: Path) -> Path:
     (out / "instagram-caption.txt").write_text(instagram_caption_for(topic, target_date), encoding="utf-8")
     (out / "facebook-caption.txt").write_text(facebook_post_for(topic), encoding="utf-8")
     (out / "linkedin-post.txt").write_text(linkedin_post_for(topic, source_lines), encoding="utf-8")
+    (out / "linkedin-post-en.txt").write_text(linkedin_english_post_for(topic, source_lines), encoding="utf-8")
     (out / "reddit-title.txt").write_text(topic.x_post, encoding="utf-8")
     (out / "reddit-post.txt").write_text(linkedin_post_for(topic, source_lines), encoding="utf-8")
     (out / "x-post.txt").write_text(topic.x_post, encoding="utf-8")
