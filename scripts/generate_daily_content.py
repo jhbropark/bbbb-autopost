@@ -505,14 +505,23 @@ def fallback_background() -> Image.Image:
 
 def load_topic_photo(topic: Topic, page: int) -> Image.Image:
     synced = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.jpg")) + sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.png"))
-    candidates = [path for path in synced if path.is_file()]
-    if not candidates:
-        candidates = [path for path in PHOTO_BACKGROUNDS.get(topic.slug, ()) if path.is_file()]
+    fallback = list(PHOTO_BACKGROUNDS.get(topic.slug, ()))
+    candidates = []
+    seen = set()
+    for path in [*synced, *fallback]:
+        if not path.is_file():
+            continue
+        key = path.resolve()
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(path)
     if not candidates:
         raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
 
     variant = PAGE_VARIANTS[(page - 1) % len(PAGE_VARIANTS)]
-    source = candidates[(page - 1) % len(candidates)]
+    source_index = (page - 1) % len(candidates)
+    source = candidates[source_index]
     photo = Image.open(source)
     photo = ImageOps.exif_transpose(photo).convert("RGB")
     photo = ImageOps.fit(
@@ -527,7 +536,8 @@ def load_topic_photo(topic: Topic, page: int) -> Image.Image:
     photo = ImageEnhance.Color(photo).enhance(0.68)
     photo = ImageEnhance.Contrast(photo).enhance(1.16)
     if page > len(candidates) and len(candidates) > 1:
-        secondary = Image.open(candidates[page % len(candidates)])
+        secondary_index = (source_index + max(1, len(candidates) // 2)) % len(candidates)
+        secondary = Image.open(candidates[secondary_index])
         secondary = ImageOps.exif_transpose(secondary).convert("RGB")
         secondary = ImageOps.fit(
             secondary,
