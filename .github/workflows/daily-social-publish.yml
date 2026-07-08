@@ -106,14 +106,16 @@ jobs:
         shell: bash
         run: |
           PUBLIC_PATH="social/${GITHUB_RUN_ID}/${CONTENT_SLUG}"
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
           mkdir -p "_site/${PUBLIC_PATH}"
           cp "${CONTENT_DIR}/carousel/"*.png "_site/${PUBLIC_PATH}/"
+          cp "${CONTENT_DIR}/instagram-carousel/"*.jpg "_site/${PUBLIC_PATH}/"
           cp "${CONTENT_DIR}/x-browser-handoff.html" "_site/${PUBLIC_PATH}/"
           cp "${CONTENT_DIR}/instagram-reel.mp4" "_site/${PUBLIC_PATH}/"
           touch "_site/.nojekyll"
           echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
           echo "PUBLIC_PATH=${PUBLIC_PATH}" >> "$GITHUB_ENV"
-          echo "PUBLISH_BASE_URL=https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/pages-history/${PUBLIC_PATH}" >> "$GITHUB_ENV"
+          echo "PUBLISH_BASE_URL=https://${GITHUB_REPOSITORY_OWNER}.github.io/${REPO_NAME}/${PUBLIC_PATH}" >> "$GITHUB_ENV"
 
       - name: Persist GitHub Pages asset history
         shell: bash
@@ -129,6 +131,18 @@ jobs:
           git push --force origin pages-history
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy Pages
+        timeout-minutes: 3
+        uses: actions/deploy-pages@v4
 
       - name: Check Instagram cooldown
         id: instagram-cooldown
@@ -146,7 +160,7 @@ jobs:
         if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
         run: |
           python scripts/meta_publish.py \
-            --carousel-dir "${CONTENT_DIR}/carousel" \
+            --carousel-dir "${CONTENT_DIR}/instagram-carousel" \
             --public-base-url "${PUBLISH_BASE_URL}" \
             --instagram-caption "${CONTENT_DIR}/instagram-caption.txt" \
             --facebook-caption "${CONTENT_DIR}/facebook-caption.txt" \
@@ -308,19 +322,3 @@ jobs:
         with:
           name: publish-log
           path: ${{ env.CONTENT_DIR }}/*-publish-results.json
-
-      - name: Configure Pages
-        if: ${{ always() }}
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
-        if: ${{ always() }}
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
-
-      - name: Deploy Pages
-        if: ${{ always() }}
-        timeout-minutes: 3
-        continue-on-error: true
-        uses: actions/deploy-pages@v4

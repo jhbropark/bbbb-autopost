@@ -692,9 +692,13 @@ def main() -> int:
         raise PublishError(f"Unsupported channels: {', '.join(sorted(invalid_channels))}")
 
     carousel_dir = Path(args.carousel_dir)
-    image_paths = sorted(carousel_dir.glob("*.png"))
+    image_paths = sorted(
+        path
+        for path in carousel_dir.iterdir()
+        if path.is_file() and path.suffix.lower() in {".jpg", ".jpeg", ".png"}
+    )
     if not image_paths:
-        raise PublishError(f"No PNG files found in {carousel_dir}")
+        raise PublishError(f"No JPG, JPEG, or PNG files found in {carousel_dir}")
     base = args.public_base_url.rstrip("/")
     image_urls = [f"{base}/{path.name}" for path in image_paths]
     payload = {

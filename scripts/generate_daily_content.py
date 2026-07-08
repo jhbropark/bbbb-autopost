@@ -874,7 +874,9 @@ def create_package(target_date: date, out_root: Path) -> Path:
     validate_topic_assets(topic)
     out = out_root / f"{target_date.isoformat()}-{topic.slug}"
     carousel = out / "carousel"
+    instagram_carousel = out / "instagram-carousel"
     carousel.mkdir(parents=True, exist_ok=True)
+    instagram_carousel.mkdir(parents=True, exist_ok=True)
 
     slides = [
         slide_hook(topic),
@@ -885,6 +887,7 @@ def create_package(target_date: date, out_root: Path) -> Path:
     ]
     for page, image in enumerate(slides, start=1):
         image.save(carousel / f"{page:02d}.png", quality=95)
+        image.convert("RGB").save(instagram_carousel / f"{page:02d}.jpg", quality=92, optimize=True)
 
     source_lines = "\n".join(f"- {source.title} ({source.date}) {source.url}" for source in topic.sources)
     (out / "instagram-caption.txt").write_text(instagram_caption_for(topic, target_date), encoding="utf-8")
