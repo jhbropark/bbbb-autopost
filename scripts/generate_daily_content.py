@@ -75,11 +75,11 @@ PHOTO_BACKGROUNDS = {
 }
 
 PAGE_VARIANTS = (
-    {"photo": 0, "center": (0.38, 0.45), "zoom": 1.00, "blur": 0.8, "mirror": False, "tint": (5, 14, 24)},
-    {"photo": 1, "center": (0.55, 0.52), "zoom": 1.08, "blur": 0.5, "mirror": False, "tint": (10, 20, 28)},
-    {"photo": 0, "center": (0.68, 0.42), "zoom": 1.22, "blur": 1.1, "mirror": True, "tint": (9, 22, 32)},
-    {"photo": 1, "center": (0.32, 0.60), "zoom": 1.18, "blur": 0.8, "mirror": True, "tint": (15, 22, 32)},
-    {"photo": 0, "center": (0.50, 0.64), "zoom": 1.35, "blur": 1.4, "mirror": False, "tint": (6, 20, 31)},
+    {"photo": 0, "center": (0.38, 0.45), "zoom": 1.00, "blur": 0.15, "mirror": False, "tint": (5, 14, 24)},
+    {"photo": 1, "center": (0.55, 0.52), "zoom": 1.08, "blur": 0.10, "mirror": False, "tint": (10, 20, 28)},
+    {"photo": 0, "center": (0.68, 0.42), "zoom": 1.22, "blur": 0.18, "mirror": True, "tint": (9, 22, 32)},
+    {"photo": 1, "center": (0.32, 0.60), "zoom": 1.18, "blur": 0.12, "mirror": True, "tint": (15, 22, 32)},
+    {"photo": 0, "center": (0.50, 0.64), "zoom": 1.35, "blur": 0.18, "mirror": False, "tint": (6, 20, 31)},
 )
 
 
@@ -504,11 +504,14 @@ def fallback_background() -> Image.Image:
 
 
 def load_topic_photo(topic: Topic, page: int) -> Image.Image:
-    synced = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.jpg")) + sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.png"))
+    synced_jpg = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.jpg")) + sorted(
+        (FREE_PHOTO_ROOT / topic.slug).glob("*.jpeg")
+    )
+    synced_png = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.png"))
     fallback = list(PHOTO_BACKGROUNDS.get(topic.slug, ()))
     candidates = []
     seen = set()
-    for path in [*synced, *fallback]:
+    for path in [*synced_jpg, *fallback, *synced_png]:
         if not path.is_file():
             continue
         key = path.resolve()
@@ -556,16 +559,16 @@ def load_topic_photo(topic: Topic, page: int) -> Image.Image:
 def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
     photo = load_topic_photo(topic, page)
     variant = PAGE_VARIANTS[(page - 1) % len(PAGE_VARIANTS)]
-    tint = Image.new("RGBA", image.size, (*variant["tint"], 72))
+    tint = Image.new("RGBA", image.size, (*variant["tint"], 34))
     photo = Image.alpha_composite(photo, tint)
 
     shade = Image.new("RGBA", image.size, (0, 0, 0, 0))
     shade_draw = ImageDraw.Draw(shade)
     for y in range(HEIGHT):
-        alpha = int(42 + 160 * (y / HEIGHT) ** 1.1)
+        alpha = int(14 + 92 * (y / HEIGHT) ** 1.1)
         shade_draw.line((0, y, WIDTH, y), fill=(30, 41, 59, alpha))
     for x in range(WIDTH):
-        alpha = int(150 * (1 - min(1, x / 760)))
+        alpha = int(72 * (1 - min(1, x / 760)))
         shade_draw.line((x, 0, x, HEIGHT), fill=(10, 16, 27, alpha))
 
     image.alpha_composite(photo)
@@ -594,6 +597,123 @@ def title(draw: ImageDraw.ImageDraw, y: int, value: str, size: int = 54, color: 
 
 def translucent_panel(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int], alpha: int = 205) -> None:
     return None
+
+
+CASE_STUDY_SLIDES = {
+    "kbeauty-ma-system-risk": (
+        ("MARKET CASE", "K-뷰티 M&A 뉴스에서\n봐야 할 것은 인수가가 아닙니다", "인수 후 브랜드가 흔들리는 지점은 제품보다 운영 속도입니다."),
+        ("WHAT TO SEE", "글로벌 본사가 들어오면\n브랜드의 의사결정 리듬이 바뀝니다", "출시 속도, 채널 통제, 현장 반응성이 핵심 신호입니다."),
+        ("BRAND RISK", "잘 팔리던 브랜드도\n시스템이 바뀌면 메시지가 느려집니다", "콘텐츠는 성과보다 운영 구조를 먼저 해석해야 합니다."),
+        ("BBBB FRAME", "이 사례는 제품 홍보가 아니라\n브랜드 운영 언어로 번역해야 합니다", "Instagram은 장면, Facebook은 맥락, LinkedIn은 구조를 맡습니다."),
+        ("SAVE THIS", "K-뷰티 M&A 콘텐츠는\n이 세 가지를 먼저 봅니다", "속도 / 채널 / 브랜드 기억"),
+    ),
+    "derma-cosmetic-expansion": (
+        ("DERMA CASE", "더마코스메틱 확장은\n성분보다 사용 장면에서 설득됩니다", "성분명만으로는 소비자가 선택 이유를 이해하기 어렵습니다."),
+        ("WHAT TO SEE", "뷰티 디바이스와 기능성 화장품은\n검증 가능한 사용 맥락이 필요합니다", "기능, 제형, 사용 루틴을 한 장면으로 연결해야 합니다."),
+        ("BRAND RISK", "과학적으로 보이는 말이 많을수록\n신뢰가 자동으로 생기지는 않습니다", "표현 범위와 증거 수준을 분리해야 합니다."),
+        ("BBBB FRAME", "더마 콘텐츠는 성분 설명이 아니라\n선택 기준을 설계하는 일입니다", "작용 순서와 사용 이유를 먼저 보여줘야 합니다."),
+        ("SAVE THIS", "더마 브랜드 콘텐츠는\n이 순서로 검토합니다", "성분 / 작용 / 사용 장면"),
+    ),
+    "clinical-proof-translation": (
+        ("PROOF CASE", "임상 근거는 많을수록 좋은 것이 아니라\n이해 가능한 순서가 중요합니다", "근거는 소비자의 판단 언어로 번역될 때 힘을 가집니다."),
+        ("WHAT TO SEE", "효능 표현은 데이터보다\n해석의 순서에서 신뢰가 갈립니다", "무엇을 말할 수 있고 무엇을 말하면 안 되는지 보여줘야 합니다."),
+        ("BRAND RISK", "과장된 한 문장은\n좋은 근거 전체를 약하게 만듭니다", "규제 가능한 표현과 브랜드 언어를 분리해야 합니다."),
+        ("BBBB FRAME", "증거는 카피가 아니라\n콘텐츠 구조로 번역되어야 합니다", "근거, 사용 장면, 판단 기준을 한 흐름으로 묶습니다."),
+        ("SAVE THIS", "효능 콘텐츠는\n이 세 가지를 먼저 확인합니다", "근거 출처 / 표현 범위 / 판단 기준"),
+    ),
+    "post-acquisition-brand-system": (
+        ("BRAND CASE", "인수 후 브랜드가 약해지는 이유는\n디자인보다 운영 언어에 있습니다", "브랜드의 감각은 의사결정 구조와 함께 움직입니다."),
+        ("WHAT TO SEE", "같은 제품도 본사가 바뀌면\n출시 리듬과 메시지 구조가 달라집니다", "브랜드 고유의 속도가 유지되는지 봐야 합니다."),
+        ("BRAND RISK", "브랜드 이름은 남아도\n소비자가 기억하던 방식은 사라질 수 있습니다", "콘텐츠는 그 변화를 설명해야 합니다."),
+        ("BBBB FRAME", "인수 후 콘텐츠는\n운영 시스템을 시각화하는 작업입니다", "현장 감각, 본사 기준, 채널 역할을 분리합니다."),
+        ("SAVE THIS", "인수 후 브랜드를 볼 때\n이 세 가지를 확인합니다", "속도 / 자율성 / 소비자 기억"),
+    ),
+    "mechanism-in-motion": (
+        ("MOA CASE", "해외 의료 영상은\n제품보다 작동 장면을 먼저 보여줍니다", "좋은 의료 콘텐츠는 보이지 않는 원리를 장면으로 바꿉니다."),
+        ("WHAT TO SEE", "흡수·전달·보호 같은 말은\n움직임으로 보여줄 때 이해됩니다", "작동 순서가 보이면 소비자는 선택 이유를 기억합니다."),
+        ("BRAND RISK", "제품 컷이 선명해도\n작용 원리가 보이지 않으면 설명은 약해집니다", "메디컬 스킨케어는 보이지 않는 부분을 설명해야 합니다."),
+        ("BBBB FRAME", "BBBB는 제품을 크게 보이게 하기보다\n작동 원리를 보이게 만듭니다", "Instagram은 즉시 이해, Facebook은 이유, LinkedIn은 제작 논리를 맡습니다."),
+        ("SAVE THIS", "메디컬 영상 제작 전\n이 세 가지를 먼저 정합니다", "작동 원리 / 이해 순서 / 검토 범위"),
+    ),
+    "patient-understanding-system": (
+        ("PATIENT CASE", "환자 교육 콘텐츠는\n정보량보다 따라갈 순서가 중요합니다", "좋은 설명은 환자가 다음 질문을 예측하게 만듭니다."),
+        ("WHAT TO SEE", "전문 용어를 줄이는 것보다\n장면의 순서를 만드는 일이 먼저입니다", "진단, 작용, 사용, 기대 결과를 분리해야 합니다."),
+        ("BRAND RISK", "쉬운 말만으로는\n복잡한 치료 경험을 설명할 수 없습니다", "반복해서 볼 수 있는 시각 구조가 필요합니다."),
+        ("BBBB FRAME", "환자 이해 콘텐츠는\n설명문이 아니라 안내 시스템입니다", "상담, 교육, 마케팅 메시지가 같은 화면 언어를 써야 합니다."),
+        ("SAVE THIS", "환자 교육 콘텐츠는\n이 세 가지로 점검합니다", "첫 질문 / 핵심 장면 / 기대 결과"),
+    ),
+    "pharma-visual-proof": (
+        ("SCIENCE CASE", "제약·바이오 메시지는\n데이터보다 작용 장면에서 설득됩니다", "근거는 작동 원리와 연결될 때 기억됩니다."),
+        ("WHAT TO SEE", "MoA는 설명문보다\n시각적 경로로 보여줄 때 강해집니다", "세포, 조직, 기기, 환자 맥락 중 무엇을 보여줄지 정해야 합니다."),
+        ("BRAND RISK", "근거가 많아도\n장면으로 번역되지 않으면 메시지는 어려워집니다", "과학 정확성과 브랜드 기억 장면을 함께 설계해야 합니다."),
+        ("BBBB FRAME", "BBBB는 데이터를 줄이지 않고\n이해 가능한 구조로 바꿉니다", "HCP, 투자자, 소비자에게 필요한 깊이를 다르게 번역합니다."),
+        ("SAVE THIS", "제약·바이오 콘텐츠는\n이 세 가지를 먼저 봅니다", "MoA / 근거 경계 / 대상별 깊이"),
+    ),
+    "medical-visual-production-standard": (
+        ("PRODUCTION CASE", "전문적인 메디컬 콘텐츠는\n멋진 이미지보다 검토 가능한 구조에서 시작됩니다", "좋은 비주얼은 정확성과 재사용성을 함께 가져야 합니다."),
+        ("WHAT TO SEE", "의료 영상은 예쁘게 만드는 일이 아니라\n검토 가능한 설명을 만드는 일입니다", "목적, 시청자, 표현 범위를 먼저 고정해야 합니다."),
+        ("BRAND RISK", "장면은 좋아 보여도\n검토 기준이 없으면 브랜드 자산이 되기 어렵습니다", "스토리보드 단계에서 과학과 채널 목적을 연결해야 합니다."),
+        ("BBBB FRAME", "BBBB는 영상 한 편이 아니라\n반복 가능한 시각 언어를 설계합니다", "교육, 세일즈, HCP 커뮤니케이션까지 같은 구조로 확장합니다."),
+        ("SAVE THIS", "메디컬 비주얼 제작은\n이 세 가지로 시작합니다", "목적 / 정확성 / 재사용"),
+    ),
+}
+
+
+def case_slide_copy(topic: Topic, page: int) -> tuple[str, str, str]:
+    return CASE_STUDY_SLIDES[topic.slug][page - 1]
+
+
+def draw_feed_gradient(image: Image.Image) -> None:
+    overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    for y in range(HEIGHT):
+        ratio = y / HEIGHT
+        bottom = max(0, (ratio - 0.52) / 0.48)
+        top = max(0, (0.24 - ratio) / 0.24)
+        alpha = int(18 + 198 * (bottom ** 1.6) + 45 * top)
+        draw.line((0, y, WIDTH, y), fill=(0, 0, 0, min(238, alpha)))
+    image.alpha_composite(overlay)
+
+
+def draw_feed_label(draw: ImageDraw.ImageDraw, label: str, page: int) -> None:
+    label_text = f"{label}  {page:02d}/05"
+    x, y = SAFE_X, 684
+    box = draw.textbbox((x, y), label_text, font=font(17, True))
+    pad_x, pad_y = 9, 6
+    draw.rounded_rectangle(
+        (box[0] - pad_x, box[1] - pad_y, box[2] + pad_x, box[3] + pad_y),
+        radius=3,
+        fill=(248, 246, 242, 232),
+    )
+    draw_text(draw, (x, y), label_text, 17, INK, True, 2)
+
+
+def draw_feed_headline(draw: ImageDraw.ImageDraw, headline: str, subline: str) -> None:
+    y = 724
+    headline_text = wrap(headline, 22)
+    size = fit_text(draw, headline_text, SAFE_RIGHT - SAFE_X, 64, 42)
+    while text_height(headline_text, size, True, 10) > 230 and size > 42:
+        size -= 2
+    draw_text(draw, (SAFE_X + 3, y + 3), headline_text, size, (0, 0, 0, 165), True, 10)
+    draw_text(draw, (SAFE_X, y), headline_text, size, WHITE, True, 10)
+
+    subline_text = wrap(subline, 30)
+    subline_y = y + text_height(headline_text, size, True, 10) + 32
+    if subline_y + text_height(subline_text, 27, False, 8) < 990:
+        draw_text(draw, (SAFE_X + 2, subline_y + 2), subline_text, 27, (0, 0, 0, 160), False, 8)
+        draw_text(draw, (SAFE_X, subline_y), subline_text, 27, (255, 255, 255, 224), False, 8)
+
+
+def feed_slide(topic: Topic, page: int) -> Image.Image:
+    image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 255))
+    add_photo_background(image, topic, page)
+    draw_feed_gradient(image)
+    draw = ImageDraw.Draw(image)
+    label, headline, subline = case_slide_copy(topic, page)
+    draw_feed_label(draw, label, page)
+    draw_feed_headline(draw, headline, subline)
+    footer(draw)
+    return image.convert("RGB")
 
 
 LINKEDIN_ENGLISH_BRIEFS = {
@@ -879,11 +999,11 @@ def create_package(target_date: date, out_root: Path) -> Path:
     instagram_carousel.mkdir(parents=True, exist_ok=True)
 
     slides = [
-        slide_hook(topic),
-        slide_evidence(topic),
-        slide_dilemma(topic),
-        slide_production(topic),
-        slide_checklist(topic),
+        feed_slide(topic, 1),
+        feed_slide(topic, 2),
+        feed_slide(topic, 3),
+        feed_slide(topic, 4),
+        feed_slide(topic, 5),
     ]
     for page, image in enumerate(slides, start=1):
         image.save(carousel / f"{page:02d}.png", quality=95)
