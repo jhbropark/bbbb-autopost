@@ -16,6 +16,7 @@ from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 ANCHOR_DATE = date(2026, 6, 22)
+CONTENT_POLICY_PATH = ROOT / "config" / "content_policy.json"
 
 NAVY = "#1E293B"
 WHITE = "#FFFFFF"
@@ -988,9 +989,25 @@ def validate_topic_assets(topic: Topic) -> None:
         )
 
 
+def load_disabled_pillars() -> set[str]:
+    if not CONTENT_POLICY_PATH.exists():
+        return set()
+    payload = json.loads(CONTENT_POLICY_PATH.read_text(encoding="utf-8"))
+    return {str(pillar).strip().casefold() for pillar in payload.get("disabled_pillars", []) if str(pillar).strip()}
+
+
+def active_topics() -> tuple[Topic, ...]:
+    disabled = load_disabled_pillars()
+    topics = tuple(topic for topic in TOPICS if topic.pillar.casefold() not in disabled)
+    if not topics:
+        raise RuntimeError("No active topics available after applying content policy.")
+    return topics
+
+
 def create_package(target_date: date, out_root: Path) -> Path:
-    index = (target_date - ANCHOR_DATE).days % len(TOPICS)
-    topic = TOPICS[index]
+    topics = active_topics()
+    index = (target_date - ANCHOR_DATE).days % len(topics)
+    topic = topics[index]
     validate_topic_assets(topic)
     out = out_root / f"{target_date.isoformat()}-{topic.slug}"
     carousel = out / "carousel"

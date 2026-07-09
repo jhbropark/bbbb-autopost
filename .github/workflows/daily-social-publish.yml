@@ -76,6 +76,9 @@ jobs:
           echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
           echo "CONTENT_SLUG=$(basename "${CONTENT_DIR}")" >> "$GITHUB_ENV"
 
+      - name: Validate publish policy
+        run: python scripts/validate_publish_policy.py --content-dir "${CONTENT_DIR}"
+
       - name: Build X browser publishing handoff
         run: |
           python scripts/x_browser_handoff.py \
