@@ -40,9 +40,43 @@ REDDIT_USERNAME=...
 REDDIT_PASSWORD=...
 REDDIT_SUBREDDIT=...
 REDDIT_USER_AGENT=windows:bbbb-autopost:v1.0 (by /u/YOUR_REDDIT_USERNAME)
+PEXELS_API_KEY=...
+PIXABAY_API_KEY=...
+OPENAI_API_KEY=...
 ```
 
 Do not store these values in committed files.
+
+`OPENAI_IMAGE_MODEL` may be set as a repository variable. The workflow defaults
+to `gpt-image-2` when it is not set.
+
+## Topic Image Requirement
+
+The scheduled workflow now blocks publishing unless the current topic has at
+least five unique visual sources. Image sync uses this priority:
+
+1. Pexels
+2. Pixabay
+3. OpenAI Image API generated abstract brand visuals
+
+The generator writes `visual-source-manifest.json` with the selected source file
+and SHA-256 hash for each carousel slide. `validate_publish_policy.py` blocks
+publishing when that manifest is missing or has fewer than five unique hashes.
+Each manifest item must also identify its provider as `pexels`, `pixabay`, or
+`openai`; generic local fallback photos are not valid publish assets.
+
+The Instagram caption is treated as a distribution asset, not a leftover note.
+The validator blocks publishing unless the first non-empty caption line is a
+hook question and the caption includes at least five relevant hashtags.
+
+Instagram operating notes used by the generator:
+
+- First slide: lead with a problem, contrast, or save-worthy criterion.
+- Caption: open with a question that names the tension in the visual.
+- Keywords: repeat the subject in the caption and hashtags so discovery has
+  clear topical signals.
+- Visuals: avoid repeated lab-glassware defaults; use topic-specific Pexels,
+  then Pixabay, then OpenAI-generated brand abstraction.
 
 ## Meta Token Requirement
 

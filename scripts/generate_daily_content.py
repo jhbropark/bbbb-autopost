@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import date
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -31,6 +32,67 @@ SAFE_RIGHT = 976
 PHOTO_ROOT = ROOT / "assets" / "photo-backgrounds"
 FREE_PHOTO_ROOT = ROOT / "assets" / "free-image-backgrounds"
 FONT_ROOT = ROOT / "assets" / "fonts"
+MIN_UNIQUE_TOPIC_IMAGES = 5
+INSTAGRAM_HASHTAGS = (
+    "#BBBBBeauty",
+    "#MedicalAesthetics",
+    "#BeautyMarketing",
+    "#MedicalContent",
+    "#BrandExperience",
+    "#ContentStrategy",
+)
+INSTAGRAM_HOOKS = {
+    "mechanism-in-motion": (
+        "제품 사진만으로는 왜 작동하는지 설명되지 않습니다.\n"
+        "첫 장에서 보이지 않는 원리를 먼저 잡아야 저장됩니다."
+    ),
+    "patient-understanding-system": (
+        "환자는 정보량보다 다음에 무엇을 봐야 하는지에 반응합니다.\n"
+        "좋은 교육 콘텐츠는 질문의 순서를 먼저 설계합니다."
+    ),
+    "pharma-visual-proof": (
+        "근거가 많을수록 더 쉽게 보여야 합니다.\n"
+        "데이터를 장면으로 번역할 때 신뢰가 생깁니다."
+    ),
+    "medical-visual-production-standard": (
+        "멋진 의료 이미지는 충분하지 않습니다.\n"
+        "검토 가능한 제작 기준이 있어야 브랜드 자산이 됩니다."
+    ),
+}
+INSTAGRAM_CAPTION_HOOKS = {
+    "mechanism-in-motion": "왜 좋은 메디컬 영상은 제품보다 작동 장면을 먼저 보여줄까요?",
+    "patient-understanding-system": "환자 교육 콘텐츠에서 가장 먼저 보여줘야 할 장면은 무엇일까요?",
+    "pharma-visual-proof": "임상 근거가 많을수록 왜 더 단순한 장면 설계가 필요할까요?",
+    "medical-visual-production-standard": "의료 콘텐츠가 멋진 이미지에서 끝나지 않으려면 무엇을 먼저 정해야 할까요?",
+}
+INSTAGRAM_HOOKS = {
+    "mechanism-in-motion": (
+        "\uc81c\ud488 \uc0ac\uc9c4\ub9cc\uc73c\ub85c\ub294 \uc65c \uc791\ub3d9\ud558\ub294\uc9c0 \uc124\uba85\ub418\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4.\n"
+        "\uccab \uc7a5\uc5d0\uc11c \ubcf4\uc774\uc9c0 \uc54a\ub294 \uc6d0\ub9ac\ub97c \uba3c\uc800 \uc7a1\uc544\uc57c \uc800\uc7a5\ub429\ub2c8\ub2e4."
+    ),
+    "patient-understanding-system": (
+        "\ud658\uc790\ub294 \uc815\ubcf4\ub7c9\ubcf4\ub2e4 \ub2e4\uc74c\uc5d0 \ubb34\uc5c7\uc744 \ubd10\uc57c \ud558\ub294\uc9c0\uc5d0 \ubc18\uc751\ud569\ub2c8\ub2e4.\n"
+        "\uc88b\uc740 \uad50\uc721 \ucf58\ud150\uce20\ub294 \uc9c8\ubb38\uc758 \uc21c\uc11c\ub97c \uba3c\uc800 \uc124\uacc4\ud569\ub2c8\ub2e4."
+    ),
+    "pharma-visual-proof": (
+        "\uadfc\uac70\uac00 \ub9ce\uc744\uc218\ub85d \ub354 \uc27d\uac8c \ubcf4\uc5ec\uc57c \ud569\ub2c8\ub2e4.\n"
+        "\ub370\uc774\ud130\ub97c \uc7a5\uba74\uc73c\ub85c \ubc88\uc5ed\ud560 \ub54c \uc2e0\ub8b0\uac00 \uc0dd\uae41\ub2c8\ub2e4."
+    ),
+    "medical-visual-production-standard": (
+        "\uba4b\uc9c4 \uc758\ub8cc \uc774\ubbf8\uc9c0\ub294 \ucda9\ubd84\ud558\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4.\n"
+        "\uac80\ud1a0 \uac00\ub2a5\ud55c \uc81c\uc791 \uae30\uc900\uc774 \uc788\uc5b4\uc57c \ube0c\ub79c\ub4dc \uc790\uc0b0\uc774 \ub429\ub2c8\ub2e4."
+    ),
+}
+INSTAGRAM_CAPTION_HOOKS = {
+    "mechanism-in-motion": "\uc65c \uc88b\uc740 \uba54\ub514\uceec \uc601\uc0c1\uc740 \uc81c\ud488\ubcf4\ub2e4 \uc791\ub3d9 \uc7a5\uba74\uc744 \uba3c\uc800 \ubcf4\uc5ec\uc904\uae4c\uc694?",
+    "patient-understanding-system": "\ud658\uc790 \uad50\uc721 \ucf58\ud150\uce20\uc5d0\uc11c \uac00\uc7a5 \uba3c\uc800 \ubcf4\uc5ec\uc918\uc57c \ud560 \uc7a5\uba74\uc740 \ubb34\uc5c7\uc77c\uae4c\uc694?",
+    "pharma-visual-proof": "\uc784\uc0c1 \uadfc\uac70\uac00 \ub9ce\uc744\uc218\ub85d \uc65c \ub354 \ub2e8\uc21c\ud55c \uc7a5\uba74 \uc124\uacc4\uac00 \ud544\uc694\ud560\uae4c\uc694?",
+    "medical-visual-production-standard": "\uc758\ub8cc \ucf58\ud150\uce20\uac00 \uba4b\uc9c4 \uc774\ubbf8\uc9c0\uc5d0\uc11c \ub05d\ub098\uc9c0 \uc54a\uc73c\ub824\uba74 \ubb34\uc5c7\uc744 \uba3c\uc800 \uc815\ud574\uc57c \ud560\uae4c\uc694?",
+}
+INSTAGRAM_SAVE_POINT = "\uc800\uc7a5 \ud3ec\uc778\ud2b8: \uc791\ub3d9 \uc6d0\ub9ac / \uc774\ud574 \uc21c\uc11c / \uac80\ud1a0 \uae30\uc900"
+INSTAGRAM_DEFAULT_HOOK = "\uc624\ub298 \ucf58\ud150\uce20\uc5d0\uc11c \uba3c\uc800 \ubd10\uc57c \ud560 \uc7a5\uba74\uc740 \ubb34\uc5c7\uc77c\uae4c\uc694?"
+INSTAGRAM_OBSERVATION_LABEL = "\uc624\ub298\uc758 \uad00\ucc30"
+INSTAGRAM_SAVE_CRITERION = "\uc800\uc7a5\ud574\ub458 \uae30\uc900: \uc815\ubcf4\ubcf4\ub2e4 \uba3c\uc800 \ubcf4\uc774\ub294 \uc7a5\uba74\uc774 \uc120\ud0dd \uc774\uc720\ub97c \ub9cc\ub4ed\ub2c8\ub2e4."
 DERMA_BIO_BACKGROUNDS = (
     PHOTO_ROOT / "derma-bio" / "02-lab-glassware.jpg",
     PHOTO_ROOT / "derma-bio" / "01-cosmetic-jar.jpg",
@@ -505,27 +567,8 @@ def fallback_background() -> Image.Image:
 
 
 def load_topic_photo(topic: Topic, page: int) -> Image.Image:
-    synced_jpg = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.jpg")) + sorted(
-        (FREE_PHOTO_ROOT / topic.slug).glob("*.jpeg")
-    )
-    synced_png = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.png"))
-    fallback = list(PHOTO_BACKGROUNDS.get(topic.slug, ()))
-    candidates = []
-    seen = set()
-    for path in [*synced_jpg, *fallback, *synced_png]:
-        if not path.is_file():
-            continue
-        key = path.resolve()
-        if key in seen:
-            continue
-        seen.add(key)
-        candidates.append(path)
-    if not candidates:
-        raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
-
+    source = topic_photo_source(topic, page)
     variant = PAGE_VARIANTS[(page - 1) % len(PAGE_VARIANTS)]
-    source_index = (page - 1) % len(candidates)
-    source = candidates[source_index]
     photo = Image.open(source)
     photo = ImageOps.exif_transpose(photo).convert("RGB")
     photo = ImageOps.fit(
@@ -539,22 +582,56 @@ def load_topic_photo(topic: Topic, page: int) -> Image.Image:
         photo = ImageOps.mirror(photo)
     photo = ImageEnhance.Color(photo).enhance(0.68)
     photo = ImageEnhance.Contrast(photo).enhance(1.16)
-    if page > len(candidates) and len(candidates) > 1:
-        secondary_index = (source_index + max(1, len(candidates) // 2)) % len(candidates)
-        secondary = Image.open(candidates[secondary_index])
-        secondary = ImageOps.exif_transpose(secondary).convert("RGB")
-        secondary = ImageOps.fit(
-            secondary,
-            (round(WIDTH / float(variant["zoom"])), round(HEIGHT / float(variant["zoom"]))),
-            method=Image.Resampling.LANCZOS,
-            centering=(1 - float(variant["center"][0]), float(variant["center"][1])),
-        )
-        secondary = secondary.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
-        secondary = ImageOps.mirror(secondary)
-        secondary = ImageEnhance.Color(secondary).enhance(0.58)
-        secondary = ImageEnhance.Contrast(secondary).enhance(1.08)
-        photo = Image.blend(photo, secondary, 0.42)
     return photo.convert("RGBA").filter(ImageFilter.GaussianBlur(float(variant["blur"])))
+
+
+def topic_photo_candidates(topic: Topic) -> list[Path]:
+    synced_jpg = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.jpg")) + sorted(
+        (FREE_PHOTO_ROOT / topic.slug).glob("*.jpeg")
+    )
+    synced_png = sorted((FREE_PHOTO_ROOT / topic.slug).glob("*.png"))
+    candidates = []
+    seen = set()
+    for path in [*synced_jpg, *synced_png]:
+        if not path.is_file():
+            continue
+        key = path.resolve()
+        if key in seen:
+            continue
+        seen.add(key)
+        candidates.append(path)
+    return candidates
+
+
+def topic_photo_source(topic: Topic, page: int) -> Path:
+    candidates = topic_photo_candidates(topic)
+    if len(candidates) < MIN_UNIQUE_TOPIC_IMAGES:
+        raise FileNotFoundError(
+            f"Need at least {MIN_UNIQUE_TOPIC_IMAGES} unique image assets for topic slug "
+            f"{topic.slug}; found {len(candidates)}. Run scripts/sync_topic_image_assets.py. "
+            "Generic fallback backgrounds are not allowed for publishing."
+        )
+    source_index = (page - 1) % len(candidates)
+    return candidates[source_index]
+
+
+def topic_asset_credits(topic: Topic) -> dict[str, dict[str, str]]:
+    credits_path = FREE_PHOTO_ROOT / topic.slug / "credits.json"
+    if not credits_path.exists():
+        return {}
+    try:
+        payload = json.loads(credits_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+    credits: dict[str, dict[str, str]] = {}
+    for item in payload:
+        if isinstance(item, dict) and item.get("file"):
+            credits[str(item["file"])] = {
+                "provider": str(item.get("provider", "")),
+                "source_url": str(item.get("source_url", "")),
+                "query": str(item.get("query", "")),
+            }
+    return credits
 
 
 def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
@@ -818,8 +895,23 @@ def slide_hook(topic: Topic) -> Image.Image:
     add_photo_background(image, topic, 1)
     draw = ImageDraw.Draw(image)
     header(draw, topic, 1, topic.label)
-    title(draw, 305, topic.hook, 57)
-    draw_text(draw, (SAFE_X, 720), wrap(topic.one_liner, 30), 29, (255, 255, 255, 238), False, 10)
+    hook = INSTAGRAM_HOOKS.get(topic.slug, topic.hook)
+    title(draw, 280, hook, 55)
+    draw_text(draw, (SAFE_X, 750), "저장 포인트: 작동 원리 / 이해 순서 / 검토 기준", 26, AQUA, True, 8)
+    draw_text(draw, (SAFE_X, 800), wrap(topic.one_liner, 30), 27, (255, 255, 255, 238), False, 10)
+    footer(draw)
+    return image.convert("RGB")
+
+
+def slide_hook(topic: Topic) -> Image.Image:
+    image = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 255))
+    add_photo_background(image, topic, 1)
+    draw = ImageDraw.Draw(image)
+    header(draw, topic, 1, topic.label)
+    hook = INSTAGRAM_HOOKS.get(topic.slug, topic.hook)
+    title(draw, 280, hook, 55)
+    draw_text(draw, (SAFE_X, 750), INSTAGRAM_SAVE_POINT, 26, AQUA, True, 8)
+    draw_text(draw, (SAFE_X, 800), wrap(topic.one_liner, 30), 27, (255, 255, 255, 238), False, 10)
     footer(draw)
     return image.convert("RGB")
 
@@ -902,6 +994,30 @@ def instagram_caption_for(topic: Topic, target_date: date) -> str:
     )
 
 
+def instagram_caption_for(topic: Topic, target_date: date) -> str:
+    hashtags = " ".join(INSTAGRAM_HASHTAGS)
+    hook = INSTAGRAM_CAPTION_HOOKS.get(topic.slug, "오늘 콘텐츠에서 먼저 봐야 할 장면은 무엇일까요?")
+    return (
+        f"{hook}\n\n"
+        f"{topic.instagram}\n\n"
+        f"오늘의 관찰: {target_date.isoformat()}\n"
+        "저장해둘 기준: 정보보다 먼저 보이는 장면이 선택 이유를 만듭니다.\n\n"
+        f"{hashtags}"
+    )
+
+
+def instagram_caption_for(topic: Topic, target_date: date) -> str:
+    hashtags = " ".join(INSTAGRAM_HASHTAGS)
+    hook = INSTAGRAM_CAPTION_HOOKS.get(topic.slug, INSTAGRAM_DEFAULT_HOOK)
+    return (
+        f"{hook}\n\n"
+        f"{topic.instagram}\n\n"
+        f"{INSTAGRAM_OBSERVATION_LABEL}: {target_date.isoformat()}\n"
+        f"{INSTAGRAM_SAVE_CRITERION}\n\n"
+        f"{hashtags}"
+    )
+
+
 def facebook_post_for(topic: Topic) -> str:
     evidence_lines = "\n".join(f"- {name}: {fact}" for name, fact in topic.evidence)
     checklist_lines = "\n".join(f"{index}. {item}" for index, item in enumerate(topic.checklist[:4], start=1))
@@ -979,13 +1095,12 @@ def linkedin_post_for(topic: Topic, source_lines: str) -> str:
 
 
 def validate_topic_assets(topic: Topic) -> None:
-    configured = PHOTO_BACKGROUNDS.get(topic.slug)
-    if not configured:
-        raise FileNotFoundError(f"No photo backgrounds configured for topic slug: {topic.slug}")
-    missing = [str(path) for path in configured if not path.is_file()]
-    if missing:
+    candidates = topic_photo_candidates(topic)
+    if len(candidates) < MIN_UNIQUE_TOPIC_IMAGES:
         raise FileNotFoundError(
-            f"Missing photo background assets for topic slug {topic.slug}: " + ", ".join(missing)
+            f"Need at least {MIN_UNIQUE_TOPIC_IMAGES} unique image assets for topic slug "
+            f"{topic.slug}; found {len(candidates)}. Run scripts/sync_topic_image_assets.py. "
+            "Generic fallback backgrounds are not allowed for publishing."
         )
 
 
@@ -1025,6 +1140,35 @@ def create_package(target_date: date, out_root: Path) -> Path:
     for page, image in enumerate(slides, start=1):
         image.save(carousel / f"{page:02d}.png", quality=95)
         image.convert("RGB").save(instagram_carousel / f"{page:02d}.jpg", quality=92, optimize=True)
+
+    visual_assets = []
+    asset_credits = topic_asset_credits(topic)
+    for page in range(1, 6):
+        source = topic_photo_source(topic, page)
+        credit = asset_credits.get(source.name, {})
+        visual_assets.append(
+            {
+                "page": page,
+                "source": str(source.relative_to(ROOT) if source.is_relative_to(ROOT) else source),
+                "provider": credit.get("provider", ""),
+                "source_url": credit.get("source_url", ""),
+                "query": credit.get("query", ""),
+                "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+            }
+        )
+    (out / "visual-source-manifest.json").write_text(
+        json.dumps(
+            {
+                "engine": "bbbb.topic-image-priority.v1",
+                "minimum_unique_sources": MIN_UNIQUE_TOPIC_IMAGES,
+                "topic": topic.slug,
+                "assets": visual_assets,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     source_lines = "\n".join(f"- {source.title} ({source.date}) {source.url}" for source in topic.sources)
     (out / "instagram-caption.txt").write_text(instagram_caption_for(topic, target_date), encoding="utf-8")

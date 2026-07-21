@@ -45,6 +45,10 @@ jobs:
       REDDIT_SUBREDDIT: ${{ secrets.REDDIT_SUBREDDIT }}
       REDDIT_FLAIR_ID: ${{ secrets.REDDIT_FLAIR_ID }}
       REDDIT_USER_AGENT: ${{ secrets.REDDIT_USER_AGENT }}
+      PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+      PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      OPENAI_IMAGE_MODEL: ${{ vars.OPENAI_IMAGE_MODEL || 'gpt-image-2' }}
       INSTAGRAM_COOLDOWN_UNTIL: ${{ vars.INSTAGRAM_COOLDOWN_UNTIL }}
       TZ: Asia/Seoul
 
@@ -66,9 +70,8 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Sync free image backgrounds
-        continue-on-error: true
-        run: python scripts/sync_free_image_assets.py --per-topic 4 --search-limit 20
+      - name: Sync topic image backgrounds
+        run: python scripts/sync_topic_image_assets.py --date "$(date +%F)" --per-topic 8 --search-limit 30 --min-per-topic 5
 
       - name: Generate date-specific content
         run: |
