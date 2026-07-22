@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 artifacts/
+artifacts-design-*/
 assets/free-image-backgrounds/
 tmp-*/
 tmp-*

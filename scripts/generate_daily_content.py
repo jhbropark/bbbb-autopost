@@ -29,10 +29,20 @@ WIDTH = 1080
 HEIGHT = 1080
 SAFE_X = 104
 SAFE_RIGHT = 976
+EDGE = 4
 PHOTO_ROOT = ROOT / "assets" / "photo-backgrounds"
 FREE_PHOTO_ROOT = ROOT / "assets" / "free-image-backgrounds"
 FONT_ROOT = ROOT / "assets" / "fonts"
 MIN_UNIQUE_TOPIC_IMAGES = 5
+BRAND_WORDMARK = "BBBB BEAUTY"
+BRAND_SERIES = "BEAUTY INTELLIGENCE"
+CTA_BY_PAGE = {
+    1: "밀어서 보기 ->",
+    2: "다음: 작동 장면 ->",
+    3: "다음: 검토 기준 ->",
+    4: "마지막은 저장 기준 ->",
+    5: "저장해두면 다시 볼 수 있어요",
+}
 INSTAGRAM_HASHTAGS = (
     "#BBBBBeauty",
     "#MedicalAesthetics",
@@ -580,9 +590,10 @@ def load_topic_photo(topic: Topic, page: int) -> Image.Image:
     photo = photo.resize((WIDTH, HEIGHT), Image.Resampling.LANCZOS)
     if variant["mirror"]:
         photo = ImageOps.mirror(photo)
-    photo = ImageEnhance.Color(photo).enhance(0.68)
-    photo = ImageEnhance.Contrast(photo).enhance(1.16)
-    return photo.convert("RGBA").filter(ImageFilter.GaussianBlur(float(variant["blur"])))
+    photo = ImageEnhance.Color(photo).enhance(0.72)
+    photo = ImageEnhance.Contrast(photo).enhance(1.22)
+    blur = max(0.0, float(variant["blur"]) - 0.6)
+    return photo.convert("RGBA").filter(ImageFilter.GaussianBlur(blur))
 
 
 def topic_photo_candidates(topic: Topic) -> list[Path]:
@@ -643,10 +654,11 @@ def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
     shade = Image.new("RGBA", image.size, (0, 0, 0, 0))
     shade_draw = ImageDraw.Draw(shade)
     for y in range(HEIGHT):
-        alpha = int(14 + 92 * (y / HEIGHT) ** 1.1)
+        ratio = y / HEIGHT
+        alpha = int(8 + 74 * (ratio ** 1.1))
         shade_draw.line((0, y, WIDTH, y), fill=(30, 41, 59, alpha))
     for x in range(WIDTH):
-        alpha = int(72 * (1 - min(1, x / 760)))
+        alpha = int(54 * (1 - min(1, x / 760)))
         shade_draw.line((x, 0, x, HEIGHT), fill=(10, 16, 27, alpha))
 
     image.alpha_composite(photo)
@@ -654,17 +666,18 @@ def add_photo_background(image: Image.Image, topic: Topic, page: int) -> None:
 
 
 def header(draw: ImageDraw.ImageDraw, topic: Topic, page: int, section: str) -> None:
-    draw_text(draw, (SAFE_X + 3, 75), f"bbbb / {topic.pillar.upper()}", 17, (0, 0, 0, 150), True)
-    draw_text(draw, (SAFE_X, 72), f"bbbb / {topic.pillar.upper()}", 17, WHITE, True)
-    draw_text(draw, (SAFE_RIGHT - 25, 75), f"{page:02d}/05", 17, (0, 0, 0, 150), True, anchor="ra")
-    draw_text(draw, (SAFE_RIGHT - 28, 72), f"{page:02d}/05", 17, AQUA, True, anchor="ra")
-    draw_text(draw, (SAFE_X + 3, 157), section, 15, (0, 0, 0, 150), True)
-    draw_text(draw, (SAFE_X, 154), section, 15, WHITE, True)
+    draw_text(draw, (SAFE_X + 3, 73), BRAND_WORDMARK, 23, (0, 0, 0, 150), True, 2)
+    draw_text(draw, (SAFE_X, 70), BRAND_WORDMARK, 23, WHITE, True, 2)
+    draw_text(draw, (SAFE_RIGHT + 3, 73), f"{page}/05", 23, (0, 0, 0, 150), True, anchor="ra")
+    draw_text(draw, (SAFE_RIGHT, 70), f"{page}/05", 23, SOFT, True, anchor="ra")
+    if page > 1:
+        draw_text(draw, (SAFE_X + 4, 183), f"{page - 1:02d}", 94, (0, 0, 0, 110), True)
+        draw_text(draw, (SAFE_X, 178), f"{page - 1:02d}", 94, (232, 226, 214, 238), True)
 
 
 def footer(draw: ImageDraw.ImageDraw) -> None:
-    draw_text(draw, (SAFE_X, 1012), "BBBB BEAUTY INTELLIGENCE", 14, (255, 255, 255, 220), True)
-    draw_text(draw, (SAFE_RIGHT, 1012), "SAVE / SHARE", 13, (255, 255, 255, 220), True, anchor="ra")
+    draw_text(draw, (SAFE_X, 1016), BRAND_SERIES, 14, (255, 255, 255, 214), True)
+    draw_text(draw, (SAFE_RIGHT, 1016), "SAVE / SHARE", 13, (255, 255, 255, 214), True, anchor="ra")
 
 
 def title(draw: ImageDraw.ImageDraw, y: int, value: str, size: int = 54, color: str = WHITE) -> None:
@@ -746,40 +759,78 @@ def draw_feed_gradient(image: Image.Image) -> None:
     draw = ImageDraw.Draw(overlay)
     for y in range(HEIGHT):
         ratio = y / HEIGHT
-        bottom = max(0, (ratio - 0.52) / 0.48)
-        top = max(0, (0.24 - ratio) / 0.24)
-        alpha = int(18 + 198 * (bottom ** 1.6) + 45 * top)
-        draw.line((0, y, WIDTH, y), fill=(0, 0, 0, min(238, alpha)))
+        bottom = max(0, (ratio - 0.50) / 0.50)
+        top = max(0, (0.18 - ratio) / 0.18)
+        alpha = int(10 + 220 * (bottom ** 1.55) + 36 * top)
+        draw.line((0, y, WIDTH, y), fill=(0, 0, 0, min(244, alpha)))
     image.alpha_composite(overlay)
 
 
 def draw_feed_label(draw: ImageDraw.ImageDraw, label: str, page: int) -> None:
-    label_text = f"{label}  {page:02d}/05"
-    x, y = SAFE_X, 684
-    box = draw.textbbox((x, y), label_text, font=font(17, True))
-    pad_x, pad_y = 9, 6
-    draw.rounded_rectangle(
-        (box[0] - pad_x, box[1] - pad_y, box[2] + pad_x, box[3] + pad_y),
-        radius=3,
-        fill=(248, 246, 242, 232),
+    label_text = label.upper()
+    if page == 1:
+        y = 660
+    elif page == 5:
+        y = 604
+    else:
+        y = 636
+    draw_text(draw, (SAFE_X + 2, y + 2), label_text, 18, (0, 0, 0, 150), True, 2)
+    draw_text(draw, (SAFE_X, y), label_text, 18, (248, 246, 242, 230), True, 2)
+
+
+def draw_progress_bar(draw: ImageDraw.ImageDraw, page: int) -> None:
+    bar_y = HEIGHT - 8
+    draw.rectangle((0, bar_y, WIDTH, HEIGHT), fill=(8, 8, 8, 255))
+    draw.rectangle((0, bar_y, round(WIDTH * page / 5), HEIGHT), fill=(232, 226, 214, 255))
+
+
+def draw_cta(draw: ImageDraw.ImageDraw, page: int) -> None:
+    cta = CTA_BY_PAGE.get(page, "밀어서 보기 ->")
+    draw_text(draw, (SAFE_X + 2, 968), cta, 22, (0, 0, 0, 155), True, 2)
+    draw_text(draw, (SAFE_X, 966), cta, 22, SOFT, True, 2)
+
+
+def draw_save_callout(draw: ImageDraw.ImageDraw) -> None:
+    box = (SAFE_X, 814, SAFE_RIGHT, 942)
+    draw.rounded_rectangle(box, radius=18, outline=(255, 255, 255, 62), width=2, fill=(0, 0, 0, 54))
+    draw_text(draw, (SAFE_X + 36, 846), "저장 포인트", 23, (232, 226, 214, 238), True, 2)
+    draw_text(
+        draw,
+        (SAFE_X + 36, 886),
+        "작동 원리 / 이해 순서 / 검토 기준",
+        29,
+        WHITE,
+        True,
+        3,
     )
-    draw_text(draw, (x, y), label_text, 17, INK, True, 2)
 
 
-def draw_feed_headline(draw: ImageDraw.ImageDraw, headline: str, subline: str) -> None:
-    y = 724
-    headline_text = wrap(headline, 22)
-    size = fit_text(draw, headline_text, SAFE_RIGHT - SAFE_X, 64, 42)
-    while text_height(headline_text, size, True, 10) > 230 and size > 42:
+def draw_feed_headline(draw: ImageDraw.ImageDraw, headline: str, subline: str, page: int) -> None:
+    if page == 1:
+        y = 706
+        start_size = 72
+    elif page == 5:
+        y = 652
+        start_size = 58
+    else:
+        y = 704
+        start_size = 64
+    headline_text = wrap(headline, 19 if page == 1 else 20)
+    size = fit_text(draw, headline_text, SAFE_RIGHT - SAFE_X, start_size, 42)
+    while text_height(headline_text, size, True, 10) > 236 and size > 42:
         size -= 2
     draw_text(draw, (SAFE_X + 3, y + 3), headline_text, size, (0, 0, 0, 165), True, 10)
     draw_text(draw, (SAFE_X, y), headline_text, size, WHITE, True, 10)
 
-    subline_text = wrap(subline, 30)
+    subline_text = wrap(subline, 28)
     subline_y = y + text_height(headline_text, size, True, 10) + 32
-    if subline_y + text_height(subline_text, 27, False, 8) < 990:
-        draw_text(draw, (SAFE_X + 2, subline_y + 2), subline_text, 27, (0, 0, 0, 160), False, 8)
-        draw_text(draw, (SAFE_X, subline_y), subline_text, 27, (255, 255, 255, 224), False, 8)
+    if page == 5:
+        max_subline_y = 792
+    else:
+        max_subline_y = 926
+    if subline_y + text_height(subline_text, 29, False, 10) < max_subline_y:
+        draw_text(draw, (SAFE_X + 2, subline_y + 2), subline_text, 29, (0, 0, 0, 160), False, 10)
+        draw_text(draw, (SAFE_X, subline_y), subline_text, 29, (255, 255, 255, 226), False, 10)
 
 
 def feed_slide(topic: Topic, page: int) -> Image.Image:
@@ -788,9 +839,15 @@ def feed_slide(topic: Topic, page: int) -> Image.Image:
     draw_feed_gradient(image)
     draw = ImageDraw.Draw(image)
     label, headline, subline = case_slide_copy(topic, page)
+    header(draw, topic, page, label)
     draw_feed_label(draw, label, page)
-    draw_feed_headline(draw, headline, subline)
+    draw_feed_headline(draw, headline, subline, page)
+    if page == 5:
+        draw_save_callout(draw)
+    draw_cta(draw, page)
     footer(draw)
+    draw.rectangle((0, 0, WIDTH - 1, HEIGHT - 1), outline=(8, 8, 8, 255), width=EDGE)
+    draw_progress_bar(draw, page)
     return image.convert("RGB")
 
 
@@ -1160,9 +1217,30 @@ def create_package(target_date: date, out_root: Path) -> Path:
         json.dumps(
             {
                 "engine": "bbbb.topic-image-priority.v1",
+                "design_system": "bbbb.editorial-carousel.v2",
                 "minimum_unique_sources": MIN_UNIQUE_TOPIC_IMAGES,
                 "topic": topic.slug,
                 "assets": visual_assets,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    (out / "design-guide.json").write_text(
+        json.dumps(
+            {
+                "system": "bbbb.editorial-carousel.v2",
+                "reference": "editorial architecture/news carousel",
+                "rules": [
+                    "Full-bleed topic image, no decorative grid background.",
+                    "Top-left BBBB wordmark and top-right page count on every slide.",
+                    "Large section number on internal slides.",
+                    "Dark bottom gradient for headline readability.",
+                    "One strong hook headline in the lower third.",
+                    "Bottom CTA and progress bar to encourage swiping and saving.",
+                    "No provider/source label is printed on the image.",
+                ],
             },
             ensure_ascii=False,
             indent=2,

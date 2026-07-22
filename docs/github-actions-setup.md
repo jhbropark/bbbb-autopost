@@ -78,6 +78,22 @@ Instagram operating notes used by the generator:
 - Visuals: avoid repeated lab-glassware defaults; use topic-specific Pexels,
   then Pixabay, then OpenAI-generated brand abstraction.
 
+## Instagram Carousel Design System
+
+Generated image posts use `bbbb.editorial-carousel.v2`, based on an
+editorial architecture/news-carousel reference:
+
+- Full-bleed topic image, no grid background and no visible source/provider
+  labels.
+- Top-left BBBB wordmark and top-right page count on every slide.
+- Internal slides use a large `01`, `02`, `03`, `04` section number to create
+  a clear carousel reading rhythm.
+- Copy sits in the lower third over a dark gradient: one large hook headline,
+  one supporting sentence, and one swipe/save CTA.
+- A thin bottom progress bar shows the reader where they are in the carousel.
+- Final slide includes a save-worthy criterion so the post has a clear reason
+  to be saved, not only viewed.
+
 ## Meta Token Requirement
 
 Use separate tokens for each publishing surface:
