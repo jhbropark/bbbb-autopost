@@ -4,3 +4,4 @@ __pycache__/
 artifacts/
 assets/free-image-backgrounds/
 tmp-*/
+tmp-*

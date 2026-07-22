@@ -7,6 +7,10 @@ on:
         description: "Validate without publishing"
         required: false
         default: "false"
+      publish_scope:
+        description: "Publish scope: all, instagram, instagram_reel, facebook, linkedin, linkedin_en, x, reddit"
+        required: false
+        default: "all"
   schedule:
     # 09:00 KST
     - cron: "0 0 * * *"
@@ -150,20 +154,38 @@ jobs:
         timeout-minutes: 3
         uses: actions/deploy-pages@v4
 
+      - name: Verify public media URLs
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for ext in jpg png; do
+            for page in 01 02 03 04 05; do
+              url="${PUBLISH_BASE_URL}/${page}.${ext}"
+              headers="$(curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --head "${url}")"
+              echo "${headers}" | grep -i '^content-type: image/' >/dev/null
+              curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --range 0-2047 --output /dev/null "${url}"
+            done
+          done
+          reel_headers="$(curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --head "${PUBLISH_BASE_URL}/instagram-reel.mp4")"
+          echo "${reel_headers}" | grep -i '^content-type: video/' >/dev/null
+          curl --fail --location --silent --show-error --retry 12 --retry-delay 5 --retry-all-errors --range 0-2047 --output /dev/null "${PUBLISH_BASE_URL}/instagram-reel.mp4"
+          sleep 30
+
       - name: Check Instagram cooldown
         id: instagram-cooldown
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram' || github.event.inputs.publish_scope == 'instagram_reel') }}
         run: python scripts/instagram_cooldown.py
 
       - name: Prevent duplicate Instagram publish
         id: duplicate-check
-        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram') && steps.instagram-cooldown.outputs.should_publish == 'true' }}
         run: |
           python scripts/prevent_duplicate_instagram_publish.py \
             --caption "${CONTENT_DIR}/instagram-caption.txt"
 
       - name: Publish Instagram
-        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram') && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
         run: |
           python scripts/meta_publish.py \
             --carousel-dir "${CONTENT_DIR}/instagram-carousel" \
@@ -175,7 +197,7 @@ jobs:
             --allow-failures
 
       - name: Record Instagram cooldown skip
-        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'false' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram' || github.event.inputs.publish_scope == 'instagram_reel') && steps.instagram-cooldown.outputs.should_publish == 'false' }}
         shell: bash
         run: |
           python - <<'PY'
@@ -198,7 +220,7 @@ jobs:
           INSTAGRAM_SKIP_REASON: ${{ steps.instagram-cooldown.outputs.reason }}
 
       - name: Record Instagram duplicate skip
-        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'false' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram') && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'false' }}
         shell: bash
         run: |
           python - <<'PY'
@@ -223,7 +245,7 @@ jobs:
           INSTAGRAM_DUPLICATE_TIMESTAMP: ${{ steps.duplicate-check.outputs.duplicate_timestamp }}
 
       - name: Publish Instagram Reel
-        if: ${{ github.event.inputs.dry_run != 'true' && steps.instagram-cooldown.outputs.should_publish == 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram_reel') && steps.instagram-cooldown.outputs.should_publish == 'true' }}
         continue-on-error: true
         run: |
           python scripts/meta_publish.py \
@@ -238,7 +260,7 @@ jobs:
             --allow-failures
 
       - name: Publish Facebook
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'facebook') }}
         continue-on-error: true
         run: |
           python scripts/meta_publish.py \
@@ -251,7 +273,7 @@ jobs:
             --allow-failures
 
       - name: Publish LinkedIn
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'linkedin') }}
         continue-on-error: true
         run: |
           python scripts/meta_publish.py \
@@ -265,7 +287,7 @@ jobs:
             --allow-failures
 
       - name: Publish LinkedIn English
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'linkedin_en') }}
         continue-on-error: true
         run: |
           python scripts/meta_publish.py \
@@ -279,7 +301,7 @@ jobs:
             --allow-failures
 
       - name: Publish X
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'x') }}
         continue-on-error: true
         run: |
           python scripts/meta_publish.py \
@@ -294,7 +316,7 @@ jobs:
             --allow-failures
 
       - name: Publish Reddit
-        if: ${{ github.event.inputs.dry_run != 'true' }}
+        if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'reddit') }}
         continue-on-error: true
         run: |
           python scripts/meta_publish.py \
