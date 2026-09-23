@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publish generated carousel content to Instagram, Facebook, LinkedIn, and X."""
+"""Publish generated carousel content through the official channel adapters."""
 
 from __future__ import annotations
 
