@@ -1,213 +1,157 @@
-# GitHub Actions Social Publishing Setup
+# GitHub Actions 게시 설정
 
-This repo can publish generated bbbb.beauty content without browser login by using:
+이 저장소의 공식 실행 경로는 다음입니다.
 
-1. Meta Business System User Token for Instagram
-2. Facebook Page Access Token for Facebook Page publishing
-3. LinkedIn OAuth access token for LinkedIn publishing
-4. X OAuth 2.0 user access token for X publishing
-5. GitHub Pages as public image hosting
-6. GitHub Actions scheduled workflow
+```text
+.github/workflows/daily-social-publish.yml
+        ↓
+scripts/generate_daily_content.py
+scripts/build_instagram_reel.py
+scripts/meta_publish.py
+```
 
-## Required GitHub Settings
+`social_publisher.py` 같은 별도 로컬 게시 CLI는 사용하지 않습니다.
 
-1. Create or connect a GitHub repository.
-2. Push this project to the repository.
-3. In the repository, go to `Settings > Pages`.
-4. Set source to `GitHub Actions`.
-5. Add these repository secrets:
+## 필수 설정
+
+Repository Settings에서 다음을 설정합니다.
+
+1. Pages Source를 `GitHub Actions`로 설정
+2. 아래 값을 Repository Secrets에 등록
+3. `LINKEDIN_VERSION`과 `OPENAI_IMAGE_MODEL`은 필요하면 Variables로 등록
+
+### Meta
 
 ```text
 META_GRAPH_VERSION=v25.0
 META_SYSTEM_USER_ACCESS_TOKEN=...
 FACEBOOK_PAGE_ACCESS_TOKEN=...
-FACEBOOK_PAGE_ID=1195784186945659
-INSTAGRAM_ACCOUNT_ID=17841424189525618
+FACEBOOK_PAGE_ID=...
+INSTAGRAM_ACCOUNT_ID=...
+```
+
+Instagram은 Meta Business System User token을 사용합니다. Facebook은 Page access token을 별도로 사용합니다.
+
+### LinkedIn
+
+```text
 LINKEDIN_ACCESS_TOKEN=...
 LINKEDIN_AUTHOR_URN=urn:li:person:...
 LINKEDIN_VERSION=202605
+```
+
+회원 게시에는 `w_member_social`, 조직 게시에는 `w_organization_social`과 조직 관리자 권한이 필요합니다.
+
+### X
+
+예약 게시에는 OAuth 1.0a Read and Write 값을 우선 사용합니다.
+
+```text
 X_API_KEY=...
 X_API_KEY_SECRET=...
 X_OAUTH1_ACCESS_TOKEN=...
 X_OAUTH1_ACCESS_TOKEN_SECRET=...
+```
+
+OAuth 2.0 fallback을 사용할 경우 다음 값이 필요합니다.
+
+```text
 X_ACCESS_TOKEN=...
-X_REFRESH_TOKEN=...
-X_CLIENT_ID=...
-X_CLIENT_SECRET=...
+```
+
+### Reddit
+
+```text
 REDDIT_CLIENT_ID=...
 REDDIT_CLIENT_SECRET=...
 REDDIT_USERNAME=...
 REDDIT_PASSWORD=...
 REDDIT_SUBREDDIT=...
-REDDIT_USER_AGENT=windows:bbbb-autopost:v1.0 (by /u/YOUR_REDDIT_USERNAME)
+REDDIT_FLAIR_ID=...
+REDDIT_USER_AGENT=...
+```
+
+현재 Reddit 구현은 native gallery가 아니라 GitHub Pages의 이미지 URL을 포함한 self post입니다.
+
+### 이미지 소싱
+
+```text
 PEXELS_API_KEY=...
 PIXABAY_API_KEY=...
 OPENAI_API_KEY=...
 ```
 
-Do not store these values in committed files.
+OpenAI 이미지 생성은 Pexels·Pixabay 결과가 최소 이미지 수를 채우지 못할 때만 사용됩니다.
 
-`OPENAI_IMAGE_MODEL` may be set as a repository variable. The workflow defaults
-to `gpt-image-2` when it is not set.
+## 예약 및 수동 실행
 
-## Topic Image Requirement
+워크플로는 매일 09:00 KST에 실행됩니다.
 
-The scheduled workflow now blocks publishing unless the current topic has at
-least five unique visual sources. Image sync uses this priority:
+수동 실행 입력값:
+
+- `dry_run=true`: 생성, Pages 배포, URL·정책 검증만 수행
+- `publish_scope=all`: 모든 채널 실행
+- `publish_scope=instagram`: Instagram 캐러셀만 실행
+- `publish_scope=instagram_reel`: Instagram Reel만 실행
+- `publish_scope=facebook`: Facebook Page 실행
+- `publish_scope=linkedin`: 한국어 LinkedIn 실행
+- `publish_scope=linkedin_en`: 영어 LinkedIn 실행
+- `publish_scope=x`: X API 실행
+- `publish_scope=reddit`: Reddit 실행
+
+## 실행 순서
+
+1. Python 3.12와 의존성 설치
+2. 현재 주제의 이미지 소싱
+3. 날짜 기반 콘텐츠 패키지 생성
+4. 게시 정책 검증
+5. X 브라우저 handoff HTML 생성
+6. Instagram Reel 생성
+7. GitHub Pages에 PNG, JPG, MP4, handoff HTML 배포
+8. 공개 미디어 URL과 Content-Type 검증
+9. Instagram cooldown 확인
+10. Instagram 최근 캡션 중복 확인
+11. `scripts/meta_publish.py`로 채널별 게시
+12. 채널별 결과 JSON을 artifact로 저장
+
+## 채널별 실제 동작
+
+- Instagram 캐러셀: 5장의 JPG를 Graph API carousel container로 게시
+- Instagram Reel: 5장의 PNG를 세로형 MP4로 만든 뒤 Graph API로 게시
+- Facebook: 5장의 PNG를 Page 다중 이미지 게시물로 게시
+- LinkedIn: 5장의 PNG를 Images API에 업로드한 뒤 `multiImage` 게시물로 게시
+- X: `x-mode.txt`에 따라 텍스트, 첫 이미지, 또는 Thread 게시
+- Reddit: 제목과 본문에 Pages 이미지 URL을 포함한 self post
+
+LinkedIn은 첫 슬라이드만 게시하지 않습니다. 현재 구현은 5장 전체를 게시합니다.
+
+X handoff는 자동 fallback이 아닙니다. 모든 실행에서 생성되는 검토용 보조 산출물이며, X API를 사용할 수 없을 때 수동 브라우저 게시에 사용합니다.
+
+## 이미지 품질과 정책 검증
+
+`sync_topic_image_assets.py`는 주제별로 다음 순서를 사용합니다.
 
 1. Pexels
 2. Pixabay
-3. OpenAI Image API generated abstract brand visuals
+3. OpenAI Image API
 
-The generator writes `visual-source-manifest.json` with the selected source file
-and SHA-256 hash for each carousel slide. `validate_publish_policy.py` blocks
-publishing when that manifest is missing or has fewer than five unique hashes.
-Each manifest item must also identify its provider as `pexels`, `pixabay`, or
-`openai`; generic local fallback photos are not valid publish assets.
+현재 주제는 최소 5개의 고유 이미지가 필요합니다. 생성기는 `visual-source-manifest.json`에 provider와 SHA-256을 기록하고, `validate_publish_policy.py`가 다음을 검사합니다.
 
-The Instagram caption is treated as a distribution asset, not a leftover note.
-The validator blocks publishing unless the first non-empty caption line is a
-hook question and the caption includes at least five relevant hashtags.
+- manifest 존재 여부
+- 최소 고유 이미지 수
+- provider가 Pexels, Pixabay, OpenAI 중 하나인지
+- Instagram caption 첫 줄이 질문형인지
+- Instagram caption에 해시태그가 5개 이상인지
+- 비활성화된 pillar인지 여부
 
-Instagram operating notes used by the generator:
+## 실패 처리
 
-- First slide: lead with a problem, contrast, or save-worthy criterion.
-- Caption: open with a question that names the tension in the visual.
-- Keywords: repeat the subject in the caption and hashtags so discovery has
-  clear topical signals.
-- Visuals: avoid repeated lab-glassware defaults; use topic-specific Pexels,
-  then Pixabay, then OpenAI-generated brand abstraction.
+`meta_publish.py`는 채널별 오류를 결과 JSON에 기록할 수 있습니다. workflow의 일부 게시 단계는 `continue-on-error`와 `--allow-failures`를 사용하므로, GitHub Actions가 성공해도 artifact의 채널별 결과를 확인해야 합니다.
 
-## Instagram Carousel Design System
+Instagram 중복 preflight API가 일시적으로 실패하면 현재 구현은 게시를 계속하고 `check_status=unavailable` 경고를 남깁니다.
 
-Generated image posts use `bbbb.editorial-carousel.v2`, based on an
-editorial architecture/news-carousel reference:
+## 공개 자산과 보안
 
-- Full-bleed topic image, no grid background and no visible source/provider
-  labels.
-- Top-left BBBB wordmark and top-right page count on every slide.
-- Internal slides use a large `01`, `02`, `03`, `04` section number to create
-  a clear carousel reading rhythm.
-- Copy sits in the lower third over a dark gradient: one large hook headline,
-  one supporting sentence, and one swipe/save CTA.
-- A thin bottom progress bar shows the reader where they are in the carousel.
-- Final slide includes a save-worthy criterion so the post has a clear reason
-  to be saved, not only viewed.
+GitHub Pages에 배포된 이미지와 영상은 공개 URL입니다. Instagram API가 공개 이미지 URL을 요구하기 때문에 필요한 설계입니다.
 
-## Meta Token Requirement
-
-Use separate tokens for each publishing surface:
-
-- Instagram: Meta Business system user token stored as `META_SYSTEM_USER_ACCESS_TOKEN`
-- Facebook: Page access token stored as `FACEBOOK_PAGE_ACCESS_TOKEN`
-
-Minimum Instagram system user token permissions:
-
-```text
-instagram_basic
-instagram_content_publish
-business_management
-```
-
-Minimum Facebook Page token permissions:
-
-```text
-pages_show_list
-pages_read_engagement
-pages_manage_posts
-```
-
-The Meta Business system user must have access to:
-
-- Instagram account: `bbbb.beauty_official`
-
-The Facebook Page access token must belong to:
-
-- Facebook Page: `Beyond Beauty Building Brands`
-
-`META_GRAPH_VERSION` is used by both publishing and Instagram duplicate-preflight
-checks. Keep it on the current supported Graph API version, and do not hard-code
-Graph API versions in helper scripts.
-
-Minimum LinkedIn token permissions:
-
-```text
-w_member_social
-```
-
-For an organization page, use `w_organization_social` and set `LINKEDIN_AUTHOR_URN` to
-`urn:li:organization:{id}`. For a personal profile, use `urn:li:person:{id}`.
-
-Recommended X credentials for scheduled publishing:
-
-```text
-X_API_KEY
-X_API_KEY_SECRET
-X_OAUTH1_ACCESS_TOKEN
-X_OAUTH1_ACCESS_TOKEN_SECRET
-```
-
-Use OAuth 1.0a tokens with Read and Write permission for durable scheduled posting.
-OAuth 2.0 access tokens expire, so they are only a fallback unless refresh handling is
-managed separately.
-
-Minimum X OAuth 2.0 user token scopes, if OAuth 2.0 is used:
-
-```text
-tweet.read
-tweet.write
-users.read
-media.write
-offline.access
-```
-
-Use an X user-context OAuth 2.0 token. App-only bearer tokens cannot create Posts.
-
-Recommended Reddit credentials for scheduled publishing:
-
-```text
-REDDIT_CLIENT_ID
-REDDIT_CLIENT_SECRET
-REDDIT_USERNAME
-REDDIT_PASSWORD
-REDDIT_SUBREDDIT
-REDDIT_USER_AGENT
-```
-
-Create a Reddit app at https://www.reddit.com/prefs/apps and use a script app for
-server-side scheduled posting. The current integration publishes a self post with the
-carousel image URLs hosted on GitHub Pages. Native Reddit image gallery upload is not
-used in this first automation path.
-
-## What The Workflow Does
-
-`.github/workflows/daily-social-publish.yml` runs daily at `09:00 KST`.
-
-Steps:
-
-1. Generate the carousel images.
-2. Copy images to a GitHub Pages artifact path.
-3. Deploy the artifact to GitHub Pages.
-4. Use the public Pages URLs as Instagram `image_url` values.
-5. Publish an Instagram carousel.
-6. Publish a Facebook multi-photo post.
-7. Publish a LinkedIn image post using the first carousel slide.
-8. Publish an X image post using the first carousel slide.
-9. Publish a Reddit self post with the carousel image URLs.
-10. Upload a publish result JSON as a workflow artifact.
-
-## Dry Run
-
-Run the workflow manually with:
-
-```text
-dry_run = true
-```
-
-This validates generated image URLs and captions without publishing to Meta.
-
-## Current Limitation
-
-The current date-based generator includes only a small topic set. To avoid
-Instagram duplicate-caption skips while the topic set is being expanded, it adds
-a date-specific observation line to each Instagram caption.
+토큰은 반드시 GitHub Secrets에 저장하고, `.env`나 소스 파일에 커밋하지 않습니다. `pages-history` 브랜치는 과거 public asset을 보존하므로 저장소 크기와 보존 정책을 주기적으로 검토해야 합니다.
