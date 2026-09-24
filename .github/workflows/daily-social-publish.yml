@@ -344,6 +344,10 @@ jobs:
             --out "${CONTENT_DIR}/github-actions-publish-results.json" \
             --dry-run
 
+      - name: Summarize channel results
+        if: ${{ always() }}
+        run: python scripts/summarize_publish_results.py --root "${CONTENT_DIR:-artifacts}"
+
       - name: Upload publish log
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

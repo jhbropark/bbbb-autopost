@@ -96,8 +96,9 @@ def main() -> int:
     write_video(images, args.out, args.seconds_each)
 
     base_caption = args.instagram_caption.read_text(encoding="utf-8").strip()
-    reel_caption = f"{base_caption}\n\nReels format: mechanism in motion."
-    args.caption_out.write_text(reel_caption, encoding="utf-8")
+    # The carousel caption is already topic-specific. Do not append a generic
+    # format label that can contradict the actual topic of the Reel.
+    args.caption_out.write_text(base_caption, encoding="utf-8")
     print(args.out)
     return 0
 

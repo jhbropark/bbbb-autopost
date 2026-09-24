@@ -42,14 +42,38 @@ CTA_BY_PAGE = {
     4: "마지막은 저장 기준 ->",
     5: "저장해두면 다시 볼 수 있어요",
 }
-INSTAGRAM_HASHTAGS = (
-    "#BBBBBeauty",
-    "#MedicalAesthetics",
-    "#BeautyMarketing",
-    "#MedicalContent",
-    "#BrandExperience",
-    "#ContentStrategy",
-)
+INSTAGRAM_HASHTAGS_BY_TOPIC = {
+    "mechanism-in-motion": (
+        "#BBBBBeauty",
+        "#MedicalAnimation",
+        "#MechanismOfAction",
+        "#MedicalContent",
+    ),
+    "patient-understanding-system": (
+        "#BBBBBeauty",
+        "#PatientEducation",
+        "#HealthCommunication",
+        "#MedicalContent",
+    ),
+    "pharma-visual-proof": (
+        "#BBBBBeauty",
+        "#PharmaMarketing",
+        "#ScientificStorytelling",
+        "#MedicalContent",
+    ),
+    "medical-visual-production-standard": (
+        "#BBBBBeauty",
+        "#MedicalVideo",
+        "#ContentReview",
+        "#BrandExperience",
+    ),
+}
+INSTAGRAM_CLOSERS = {
+    "mechanism-in-motion": "이번 장면에서 볼 것은 효과의 크기가 아니라, 보이지 않는 작동 원리가 어떤 순서로 설명되는가입니다.",
+    "patient-understanding-system": "이 콘텐츠를 볼 때는 환자가 첫 장면에서 어떤 질문을 던질지 먼저 찾아보세요.",
+    "pharma-visual-proof": "핵심은 데이터를 더 많이 보여주는 것이 아니라, 데이터가 어떤 작용을 설명하는지 분명히 하는 것입니다.",
+    "medical-visual-production-standard": "검수할 때는 이미지의 화려함보다 설명 가능한 제작 기준이 남는지 확인해야 합니다.",
+}
 INSTAGRAM_HOOKS = {
     "mechanism-in-motion": (
         "\uc81c\ud488 \uc0ac\uc9c4\ub9cc\uc73c\ub85c\ub294 \uc65c \uc791\ub3d9\ud558\ub294\uc9c0 \uc124\uba85\ub418\uc9c0 \uc54a\uc2b5\ub2c8\ub2e4.\n"
@@ -74,10 +98,19 @@ INSTAGRAM_CAPTION_HOOKS = {
     "pharma-visual-proof": "\uc784\uc0c1 \uadfc\uac70\uac00 \ub9ce\uc744\uc218\ub85d \uc65c \ub354 \ub2e8\uc21c\ud55c \uc7a5\uba74 \uc124\uacc4\uac00 \ud544\uc694\ud560\uae4c\uc694?",
     "medical-visual-production-standard": "\uc758\ub8cc \ucf58\ud150\uce20\uac00 \uba4b\uc9c4 \uc774\ubbf8\uc9c0\uc5d0\uc11c \ub05d\ub098\uc9c0 \uc54a\uc73c\ub824\uba74 \ubb34\uc5c7\uc744 \uba3c\uc800 \uc815\ud574\uc57c \ud560\uae4c\uc694?",
 }
-INSTAGRAM_SAVE_POINT = "\uc800\uc7a5 \ud3ec\uc778\ud2b8: \uc791\ub3d9 \uc6d0\ub9ac / \uc774\ud574 \uc21c\uc11c / \uac80\ud1a0 \uae30\uc900"
 INSTAGRAM_DEFAULT_HOOK = "\uc624\ub298 \ucf58\ud150\uce20\uc5d0\uc11c \uba3c\uc800 \ubd10\uc57c \ud560 \uc7a5\uba74\uc740 \ubb34\uc5c7\uc77c\uae4c\uc694?"
-INSTAGRAM_OBSERVATION_LABEL = "\uc624\ub298\uc758 \uad00\ucc30"
-INSTAGRAM_SAVE_CRITERION = "\uc800\uc7a5\ud574\ub458 \uae30\uc900: \uc815\ubcf4\ubcf4\ub2e4 \uba3c\uc800 \ubcf4\uc774\ub294 \uc7a5\uba74\uc774 \uc120\ud0dd \uc774\uc720\ub97c \ub9cc\ub4ed\ub2c8\ub2e4."
+FACEBOOK_CHANNEL_ANGLES = {
+    "mechanism-in-motion": "Facebook에서는 제품 컷만으로 설명되지 않는 작동 장면이 왜 필요한지부터 짚습니다.",
+    "patient-understanding-system": "Facebook에서는 환자와 보호자가 설명을 따라가는 순서를 어떻게 설계할지에 집중합니다.",
+    "pharma-visual-proof": "Facebook에서는 과학적 근거를 소비자가 이해할 수 있는 장면으로 번역하는 문제를 풀어봅니다.",
+    "medical-visual-production-standard": "Facebook에서는 보기 좋은 결과물과 검토 가능한 제작물의 차이를 설명합니다.",
+}
+LINKEDIN_CHANNEL_FRAMING = {
+    "mechanism-in-motion": "LinkedIn에서는 이 문제를 의료 콘텐츠 제작의 검토 범위와 재사용 가능한 제작 체계의 문제로 다룹니다.",
+    "patient-understanding-system": "LinkedIn에서는 환자 이해를 콘텐츠 미학이 아니라 정보 구조와 상담 흐름의 문제로 다룹니다.",
+    "pharma-visual-proof": "LinkedIn에서는 과학적 증거를 채널별 의사결정 언어로 번역하는 운영 문제를 다룹니다.",
+    "medical-visual-production-standard": "LinkedIn에서는 시각 품질을 과학 검수, 제작 흐름, 상업적 재사용이 연결된 기준으로 다룹니다.",
+}
 PAGE_VARIANTS = (
     {"photo": 0, "center": (0.38, 0.45), "zoom": 1.00, "blur": 0.15, "mirror": False, "tint": (5, 14, 24)},
     {"photo": 1, "center": (0.55, 0.52), "zoom": 1.08, "blur": 0.10, "mirror": False, "tint": (10, 20, 28)},
@@ -641,22 +674,20 @@ def linkedin_english_post_for(topic: Topic, source_lines: str) -> str:
 
 
 def instagram_caption_for(topic: Topic, target_date: date) -> str:
-    hashtags = " ".join(INSTAGRAM_HASHTAGS)
+    del target_date  # Instagram copy should not carry a repetitive date stamp.
+    hashtags = " ".join(INSTAGRAM_HASHTAGS_BY_TOPIC.get(topic.slug, ("#BBBBBeauty", "#MedicalContent")))
     hook = INSTAGRAM_CAPTION_HOOKS.get(topic.slug, INSTAGRAM_DEFAULT_HOOK)
-    return (
-        f"{hook}\n\n"
-        f"{topic.instagram}\n\n"
-        f"{INSTAGRAM_OBSERVATION_LABEL}: {target_date.isoformat()}\n"
-        f"{INSTAGRAM_SAVE_CRITERION}\n\n"
-        f"{hashtags}"
-    )
+    closer = INSTAGRAM_CLOSERS.get(topic.slug, "이 장면이 무엇을 설명하고 있는지 한 문장으로 정리해보세요.")
+    return f"{hook}\n\n{topic.instagram}\n\n{closer}\n\n{hashtags}"
 
 
 def facebook_post_for(topic: Topic) -> str:
     evidence_lines = "\n".join(f"- {name}: {fact}" for name, fact in topic.evidence)
     checklist_lines = "\n".join(f"{index}. {item}" for index, item in enumerate(topic.checklist[:4], start=1))
+    channel_angle = FACEBOOK_CHANNEL_ANGLES.get(topic.slug, "Facebook에서는 복잡한 의료 메시지를 이해 가능한 장면으로 번역하는 과정을 설명합니다.")
     return (
         f"{topic.facebook}\n\n"
+        f"{channel_angle}\n\n"
         "전문가 관점:\n"
         "메디컬 애니메이션 콘텐츠의 문제는 시각 자료가 부족한 것이 아니라 설명의 위계가 정리되지 않은 경우가 많다는 점입니다. "
         "과학 근거, 작용 기전, 사용 장면, 규제 가능한 표현을 같은 높이로 말하면 시청자는 무엇을 먼저 이해해야 하는지 판단하기 어렵습니다.\n\n"
@@ -673,8 +704,10 @@ def facebook_post_for(topic: Topic) -> str:
 def linkedin_post_for(topic: Topic, source_lines: str) -> str:
     production_lines = "\n".join(f"{index}. {item}" for index, item in enumerate(topic.production, start=1))
     checklist_lines = "\n".join(f"- {item}" for item in topic.checklist)
+    channel_framing = LINKEDIN_CHANNEL_FRAMING.get(topic.slug, "LinkedIn에서는 이 주제를 검토 가능한 제작 시스템의 문제로 다룹니다.")
     return (
         f"{topic.linkedin}\n\n"
+        f"{channel_framing}\n\n"
         "왜 중요한가:\n"
         "메디컬 스킨케어와 의료기기 시장에서 콘텐츠는 더 이상 단순한 홍보물이 아닙니다. "
         "과학 근거와 작용 기전을 말하는 동시에 규제 가능한 표현, 환자·소비자 이해도, HCP 검토 맥락을 함께 관리해야 하는 제작 자산입니다.\n\n"

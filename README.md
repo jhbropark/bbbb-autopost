@@ -29,7 +29,7 @@ GitHub Actions 기반의 일일 콘텐츠 생성·다중 채널 게시 파이프
 - X: 텍스트, 이미지, Thread
 - Reddit: 이미지 URL을 포함한 self post
 
-X 브라우저 handoff HTML도 생성하지만 자동 게시의 기본 경로는 X API입니다. API 실패 시 handoff 파일을 브라우저에서 검토해 수동 게시할 수 있습니다.
+X 브라우저 handoff HTML도 생성하지만 자동 게시의 기본 경로는 X API입니다. API 실패 시 workflow summary에 handoff 링크를 표시해 수동 브라우저 게시를 fallback으로 사용합니다.
 
 ## GitHub Actions 설정
 
@@ -71,7 +71,7 @@ python .\scripts\meta_publish.py `
 
 ## 게시 결과 해석
 
-게시 엔진은 채널별 결과 또는 오류를 JSON으로 기록합니다. Actions 단계가 성공해도 `--allow-failures`가 사용된 게시 단계는 일부 채널 오류를 결과 JSON에만 기록할 수 있으므로 artifact를 함께 확인해야 합니다.
+게시 엔진은 채널별 결과 또는 오류를 JSON으로 기록합니다. workflow 마지막의 `Channel publish summary`가 실제 성공 채널 수, 실패 원인, X handoff 링크를 표시합니다. Actions의 전체 상태가 `Success`여도 채널별 결과가 `PARTIAL`일 수 있으므로 summary와 artifact를 우선 확인합니다.
 
 ## 정책과 중복 방지
 
