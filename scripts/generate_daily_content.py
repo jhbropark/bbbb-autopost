@@ -443,8 +443,47 @@ def title(draw: ImageDraw.ImageDraw, y: int, value: str, size: int = 54, color: 
     draw_text(draw, (SAFE_X, y), value, size, color, True, 10)
 
 
+CASE_STUDY_SLIDES = {
+    "mechanism-in-motion": (
+        ("MOA CASE", "해외 의료 영상은\n제품보다 작동 장면을 먼저 보여줍니다", "좋은 의료 콘텐츠는 보이지 않는 원리를 장면으로 바꿉니다."),
+        ("WHAT TO SEE", "흡수·전달·보호 같은 말은\n움직임으로 보여줄 때 이해됩니다", "작동 순서가 보이면 소비자는 선택 이유를 기억합니다."),
+        ("BRAND RISK", "제품 컷이 선명해도\n작용 원리가 보이지 않으면 설명은 약해집니다", "메디컬 스킨케어는 보이지 않는 부분을 설명해야 합니다."),
+        ("BBBB FRAME", "BBBB는 제품을 크게 보이게 하기보다\n작동 원리를 보이게 만듭니다", "Instagram은 즉시 이해, Facebook은 이유, LinkedIn은 제작 논리를 맡습니다."),
+        ("SAVE THIS", "메디컬 영상 제작 전\n이 세 가지를 먼저 정합니다", "작동 원리 / 이해 순서 / 검토 범위"),
+    ),,
+    "patient-understanding-system": (
+        ("PATIENT CASE", "환자 교육 콘텐츠는\n정보량보다 따라갈 순서가 중요합니다", "좋은 설명은 환자가 다음 질문을 예측하게 만듭니다."),
+        ("WHAT TO SEE", "전문 용어를 줄이는 것보다\n장면의 순서를 만드는 일이 먼저입니다", "진단, 작용, 사용, 기대 결과를 분리해야 합니다."),
+        ("BRAND RISK", "쉬운 말만으로는\n복잡한 치료 경험을 설명할 수 없습니다", "반복해서 볼 수 있는 시각 구조가 필요합니다."),
+        ("BBBB FRAME", "환자 이해 콘텐츠는\n설명문이 아니라 안내 시스템입니다", "상담, 교육, 마케팅 메시지가 같은 화면 언어를 써야 합니다."),
+        ("SAVE THIS", "환자 교육 콘텐츠는\n이 세 가지로 점검합니다", "첫 질문 / 핵심 장면 / 기대 결과"),
+    ),,
+    "pharma-visual-proof": (
+        ("SCIENCE CASE", "제약·바이오 메시지는\n데이터보다 작용 장면에서 설득됩니다", "근거는 작동 원리와 연결될 때 기억됩니다."),
+        ("WHAT TO SEE", "MoA는 설명문보다\n시각적 경로로 보여줄 때 강해집니다", "세포, 조직, 기기, 환자 맥락 중 무엇을 보여줄지 정해야 합니다."),
+        ("BRAND RISK", "근거가 많아도\n장면으로 번역되지 않으면 메시지는 어려워집니다", "과학 정확성과 브랜드 기억 장면을 함께 설계해야 합니다."),
+        ("BBBB FRAME", "BBBB는 데이터를 줄이지 않고\n이해 가능한 구조로 바꿉니다", "HCP, 투자자, 소비자에게 필요한 깊이를 다르게 번역합니다."),
+        ("SAVE THIS", "제약·바이오 콘텐츠는\n이 세 가지를 먼저 봅니다", "MoA / 근거 경계 / 대상별 깊이"),
+    ),,
+    "medical-visual-production-standard": (
+        ("PRODUCTION CASE", "전문적인 메디컬 콘텐츠는\n멋진 이미지보다 검토 가능한 구조에서 시작됩니다", "좋은 비주얼은 정확성과 재사용성을 함께 가져야 합니다."),
+        ("WHAT TO SEE", "의료 영상은 예쁘게 만드는 일이 아니라\n검토 가능한 설명을 만드는 일입니다", "목적, 시청자, 표현 범위를 먼저 고정해야 합니다."),
+        ("BRAND RISK", "장면은 좋아 보여도\n검토 기준이 없으면 브랜드 자산이 되기 어렵습니다", "스토리보드 단계에서 과학과 채널 목적을 연결해야 합니다."),
+        ("BBBB FRAME", "BBBB는 영상 한 편이 아니라\n반복 가능한 시각 언어를 설계합니다", "교육, 세일즈, HCP 커뮤니케이션까지 같은 구조로 확장합니다."),
+        ("SAVE THIS", "메디컬 비주얼 제작은\n이 세 가지로 시작합니다", "목적 / 정확성 / 재사용"),
+    ),
+}
+}
+
+
 def case_slide_copy(topic: Topic, page: int) -> tuple[str, str, str]:
-    return CASE_STUDY_SLIDES[topic.slug][page - 1]
+    if page < 1 or page > 5:
+        raise ValueError(f"Slide page must be between 1 and 5; got {page}.")
+    try:
+        slides = CASE_STUDY_SLIDES[topic.slug]
+    except KeyError as exc:
+        raise KeyError(f"No case-study slide copy for topic slug {topic.slug!r}.") from exc
+    return slides[page - 1]
 
 
 def draw_feed_gradient(image: Image.Image) -> None:
