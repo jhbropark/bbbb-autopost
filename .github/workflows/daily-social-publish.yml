@@ -78,6 +78,7 @@ jobs:
         run: python scripts/sync_topic_image_assets.py --date "$(date +%F)" --per-topic 8 --search-limit 30 --min-per-topic 5
 
       - name: Generate date-specific content
+        id: generate-content
         run: |
           CONTENT_DIR="$(python scripts/generate_daily_content.py --date "$(date +%F)")"
           echo "CONTENT_DIR=${CONTENT_DIR}" >> "$GITHUB_ENV"
@@ -185,6 +186,7 @@ jobs:
             --caption "${CONTENT_DIR}/instagram-caption.txt"
 
       - name: Publish Instagram
+        id: publish-instagram
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram') && steps.instagram-cooldown.outputs.should_publish == 'true' && steps.duplicate-check.outputs.should_publish == 'true' }}
         run: |
           python scripts/meta_publish.py \
@@ -245,6 +247,7 @@ jobs:
           INSTAGRAM_DUPLICATE_TIMESTAMP: ${{ steps.duplicate-check.outputs.duplicate_timestamp }}
 
       - name: Publish Instagram Reel
+        id: publish-instagram-reel
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'instagram_reel') && steps.instagram-cooldown.outputs.should_publish == 'true' }}
         continue-on-error: true
         run: |
@@ -260,6 +263,7 @@ jobs:
             --allow-failures
 
       - name: Publish Facebook
+        id: publish-facebook
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'facebook') }}
         continue-on-error: true
         run: |
@@ -273,6 +277,7 @@ jobs:
             --allow-failures
 
       - name: Publish LinkedIn
+        id: publish-linkedin
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'linkedin') }}
         continue-on-error: true
         run: |
@@ -287,6 +292,7 @@ jobs:
             --allow-failures
 
       - name: Publish LinkedIn English
+        id: publish-linkedin-en
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'linkedin_en') }}
         continue-on-error: true
         run: |
@@ -301,6 +307,7 @@ jobs:
             --allow-failures
 
       - name: Publish X
+        id: publish-x
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'x') }}
         continue-on-error: true
         run: |
@@ -316,6 +323,7 @@ jobs:
             --allow-failures
 
       - name: Publish Reddit
+        id: publish-reddit
         if: ${{ github.event.inputs.dry_run != 'true' && (github.event_name == 'schedule' || github.event.inputs.publish_scope == 'all' || github.event.inputs.publish_scope == 'reddit') }}
         continue-on-error: true
         run: |
@@ -350,3 +358,17 @@ jobs:
         with:
           name: publish-log
           path: ${{ env.CONTENT_DIR }}/*-publish-results.json
+
+      - name: Summarize channel outcomes
+        if: ${{ always() && steps.generate-content.outcome == 'success' && github.event.inputs.dry_run != 'true' }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUBLISH_SCOPE: ${{ github.event.inputs.publish_scope || 'all' }}
+          PUBLISH_STEP_OUTCOMES: >-
+            {"instagram":"${{ steps.publish-instagram.outcome }}","instagram_reel":"${{ steps.publish-instagram-reel.outcome }}","facebook":"${{ steps.publish-facebook.outcome }}","linkedin_ko":"${{ steps.publish-linkedin.outcome }}","linkedin_en":"${{ steps.publish-linkedin-en.outcome }}","x":"${{ steps.publish-x.outcome }}","reddit":"${{ steps.publish-reddit.outcome }}"}
+        run: |
+          python scripts/summarize_publish_results.py \
+            --results-dir "${CONTENT_DIR}" \
+            --event "${EVENT_NAME}" \
+            --scope "${PUBLISH_SCOPE}" \
+            --step-outcomes "${PUBLISH_STEP_OUTCOMES}"
